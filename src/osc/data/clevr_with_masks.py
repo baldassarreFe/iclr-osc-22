@@ -9,6 +9,9 @@ import pandas as pd
 import tensorflow as tf
 
 IMAGE_SIZE = multi_object_datasets.clevr_with_masks.IMAGE_SIZE
+NUM_SAMPLES_TOTAL = 100_000
+NUM_SAMPLES_TRAIN = 70_000
+NUM_SAMPLES_VAL = 15_000
 
 
 def show_sample(sample):

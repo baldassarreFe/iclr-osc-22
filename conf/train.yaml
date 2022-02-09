@@ -1,0 +1,107 @@
+model:
+  # architecture: 'backbone-obj_fn(-global_fn-global_proj)-obj_proj'
+  architecture: 'backbone(-global_fn-global_proj)-obj_fn-obj_proj'
+
+  backbone:
+    patch_size: [8, 8]
+    # Embedding dimension C
+    embed_dim: 64
+    # Positional embedding
+    pos_embed: "learned"
+    pos_embed_dropout: 0.0
+    pos_embed_every_layer: yes
+    # Number of layers L
+    num_layers: 4  # L
+    # Number of heads h
+    num_heads: 4
+    # Block configuration
+    block_drop: 0.0
+    block_attn_drop: 0.0
+    drop_path: 0.0
+
+  global_fn:
+    pooling: 'avg'
+    hidden_mult: 4.0
+    activation: 'gelu'
+    dropout: 0.0
+
+  global_proj:
+    hidden_mult: 4.0
+    activation: 'gelu'
+    dropout: 0.0
+    out_bias: no
+
+  obj_fn:
+    name: 'slot-attention'
+    # Number of query tokens S
+    num_objects: 11
+    queries: "sample"
+    pos_embed: null
+    num_iters: 3
+
+  obj_proj:
+    hidden_mult: 4.0
+    activation: 'gelu'
+    dropout: 0.0
+    out_bias: no
+
+data:
+  root: '~/multi-object-datasets'
+  name: CLEVR10
+  crop_size: [128, 128]
+  normalize:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  train:
+    seed: null # defaults to random
+    max_samples: null # defaults to all
+  val:
+    seed: 6676759028237078
+    max_samples: null # defaults to all
+  viz:
+    seed: 6676759028237078
+    max_samples: 4
+
+losses:
+  l_global:
+    name: 'ctr'
+    temp: 0.1
+    weight: 1.0
+  l_objects:
+    name: 'ctr_img'
+    temp: 0.1
+    weight: 1.0
+
+optimizer:
+  name: "adam"
+  start_lr: 0.0007
+  weight_decay: 1e-3
+
+lr_scheduler:
+  warmup:
+    epochs: 20
+  decay:
+    name: 'cosine'
+    epochs: 80
+    end_lr: 0.0
+
+training:
+  batch_size: 64
+  num_epochs: null # defaults to warmup + decay
+
+logging:
+  project: iclr-osc-22
+  group: null
+  name: null # auto-generate
+  id: null # auto-generate
+  tags: []
+  notes: null
+
+other:
+  debug: no
+  seed: null # defaults to random
+  device: 'cuda:0'
+
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog

@@ -4,20 +4,28 @@ https://objects-structure-causality.github.io/
 
 ## Setup
 
-From scratch:
+Clone the repo:
+```bash
+git clone 'https://github.com/baldassarreFe/iclr-osc-22.git'
+cd iclr-osc-22
+```
+
+Environment from scratch:
 ```bash
 ENV_NAME='iclr-osc-22'
 conda create -y -n "${ENV_NAME}" -c pytorch -c conda-forge \
     python=3.9 black isort pytest pre-commit \
-    numpy pandas matplotlib seaborn scikit-learn \
+    hydra-core colorlog tqdm wandb sphinx \
+    numpy pandas matplotlib seaborn tabulate scikit-learn scikit-image \
     jupyterlab=3 jupyterlab_code_formatter jupyter_console \
-    tabulate tqdm tensorflow-cpu \
-    pytorch torchvision einops cudatoolkit-dev cudnn \
+    tensorflow-cpu pytorch torchvision einops cudatoolkit-dev cudnn
 
 conda activate "${ENV_NAME}"
 
 python -m pip install \
     timm slot_attention better_exceptions \
+    sphinx-rtd-theme sphinx-autodoc-typehints \
+    hydra_colorlog namesgenerator \
     'git+https://github.com/deepmind/multi_object_datasets'
 conda env config vars set BETTER_EXCEPTIONS=1
 pre-commit install
@@ -25,7 +33,7 @@ pre-commit install
 python -m pip install --editable .
 ```
 
-From file:
+Environment from file:
 ```bash
 ENV_NAME='iclr-osc-22'
 conda env create -n "${ENV_NAME}" -f 'environment.yaml'
@@ -34,10 +42,9 @@ pre-commit install
 python -m pip install --editable .
 ```
 
-
 # Datasets
 
-Download:
+Download ([other options](https://github.com/deepmind/multi_object_datasets)):
 ```bash
 sudo apt install -y apt-transport-https ca-certificates gnupg
 echo 'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' |
