@@ -16,14 +16,14 @@ ENV_NAME='iclr-osc-22'
 conda create -y -n "${ENV_NAME}" -c pytorch -c conda-forge \
     python=3.9 black isort pytest pre-commit \
     hydra-core colorlog tqdm wandb sphinx \
-    numpy pandas matplotlib seaborn tabulate scikit-learn scikit-image \
+    'numpy>=1.20' pandas matplotlib seaborn tabulate scikit-learn scikit-image \
     jupyterlab=3 jupyterlab_code_formatter jupyter_console \
-    tensorflow-cpu pytorch torchvision einops cudatoolkit-dev cudnn
+    tensorflow-cpu pytorch torchvision einops opt_einsum cudatoolkit-dev cudnn
 
 conda activate "${ENV_NAME}"
 
 python -m pip install \
-    timm slot_attention better_exceptions \
+    timm better_exceptions \
     sphinx-rtd-theme sphinx-autodoc-typehints \
     hydra_colorlog namesgenerator \
     'git+https://github.com/deepmind/multi_object_datasets'

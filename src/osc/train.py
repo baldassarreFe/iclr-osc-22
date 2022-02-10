@@ -6,10 +6,12 @@ from itertools import islice
 from pathlib import Path
 
 import einops
+import hydra
 import namesgenerator
 import numpy as np
 import omegaconf
 import PIL.Image as PilImage
+import tabulate
 import tensorflow as tf
 import torch
 import tqdm
@@ -39,16 +41,61 @@ from osc.models import (
 )
 from osc.models.models import vit_slot_forward_with_attns
 from osc.rollout import self_attn_rollout, slot_attn_rollout
-from osc.utils import batches_per_epoch
+from osc.utils import SigIntCatcher, batches_per_epoch, seed_everything
 from osc.viz import (
     array_to_pil,
     kmeans_clusters,
     make_grid_pil,
-    viz_contrastive_loss_global,
-    viz_contrastive_loss_objects,
+    viz_contrastive_loss_global_probs,
+    viz_contrastive_loss_objects_probs,
+    viz_positional_embedding,
 )
+from osc.wandb_utils import setup_wandb
 
 log = logging.getLogger(__name__)
+
+
+def main(cfg: DictConfig) -> None:
+    log.info("Config original:\n%s", OmegaConf.to_yaml(cfg))
+    cfg = update_cfg(cfg)
+    with open("train.yaml", "w") as f:
+        f.write(OmegaConf.to_yaml(cfg, resolve=True))
+
+    seed_everything(cfg.other.seed)
+    setup_wandb(cfg)
+
+    ds_train = build_dataset_train(cfg)
+    ds_val = build_dataset_val(cfg)
+    viz_batch = get_viz_batch(cfg)
+
+    model = build_model(cfg).to(cfg.other.device)
+    log.info(
+        "Model parameters:\n%s",
+        tabulate.tabulate(
+            [
+                [name, sum(p.numel() for p in child.parameters() if p.requires_grad)]
+                for name, child in model.named_children()
+            ],
+            headers=["Module", "Parameters"],
+        ),
+    )
+
+    optimizer = build_optimizer(cfg, model)
+    scheduler = build_scheduler(cfg, optimizer)
+    loss_fn_global, loss_fn_objects = build_losses(cfg)
+    run_train_val_viz_epochs(
+        cfg,
+        model,
+        optimizer,
+        scheduler,
+        ds_train,
+        ds_val,
+        viz_batch,
+        loss_fn_global,
+        loss_fn_objects,
+    )
+
+    log.info("Run dir: %s", Path.cwd().relative_to(hydra.utils.get_original_cwd()))
 
 
 def update_cfg(cfg: DictConfig, readonly=True):
@@ -153,10 +200,11 @@ def build_model(cfg):
         embed_dim=cfg.model.backbone.embed_dim,
         patch_size=cfg.model.backbone.patch_size,
         num_heads=cfg.model.backbone.num_heads,
-        depth=cfg.model.backbone.num_layers,
+        num_layers=cfg.model.backbone.num_layers,
         block_drop=cfg.model.backbone.block_drop,
         block_attn_drop=cfg.model.backbone.block_attn_drop,
         drop_path=cfg.model.backbone.drop_path,
+        mlp_ratio=cfg.model.backbone.mlp_ratio,
     )
 
     global_fn = torch.nn.Sequential(
@@ -166,7 +214,9 @@ def build_model(cfg):
         }[cfg.model.global_fn.pooling],
         MLP(
             in_features=cfg.model.backbone.embed_dim,
-            hidden_features=4 * cfg.model.backbone.embed_dim,
+            hidden_features=int(
+                np.round(cfg.model.global_fn.hidden_mult * cfg.model.backbone.embed_dim)
+            ),
             out_features=cfg.model.backbone.embed_dim,
             activation=activations[cfg.model.global_fn.activation],
             dropout=0.0,
@@ -175,7 +225,9 @@ def build_model(cfg):
 
     global_proj = MLP(
         in_features=cfg.model.backbone.embed_dim,
-        hidden_features=4 * cfg.model.backbone.embed_dim,
+        hidden_features=int(
+            np.round(cfg.model.global_proj.hidden_mult * cfg.model.backbone.embed_dim)
+        ),
         out_features=cfg.model.backbone.embed_dim,
         activation=activations[cfg.model.global_proj.activation],
         out_bias=False,
@@ -189,7 +241,11 @@ def build_model(cfg):
                 dim=cfg.model.backbone.embed_dim,
                 pos_embed=obj_fn_pos_embed,
                 iters=cfg.model.obj_fn.num_iters,
-                hidden_dim=cfg.model.backbone.embed_dim,
+                hidden_dim=int(
+                    np.round(
+                        cfg.model.obj_fn.hidden_mult * cfg.model.backbone.embed_dim
+                    )
+                ),
             )
         else:
             raise ValueError(cfg.model.obj_fn.queries)
@@ -504,35 +560,44 @@ def run_train_val_viz_epochs(
     loss_fn_global,
     loss_fn_objects,
 ):
-    log.info("Starting training for %d epochs", cfg.training.num_epochs)
+    log.info("Start training for %d epochs", cfg.training.num_epochs)
     step_counter = StepCounter()
-    for epoch in range(cfg.training.num_epochs):
-        run_train_epoch(
-            cfg,
-            ds_train,
-            epoch,
-            model,
-            optimizer,
-            scheduler,
-            step_counter,
-            loss_fn_global,
-            loss_fn_objects,
-        )
-        run_val_epoch(
-            cfg, ds_val, epoch, model, step_counter, loss_fn_global, loss_fn_objects
-        )
-        run_viz(
-            cfg, viz_batch, epoch, model, step_counter, loss_fn_global, loss_fn_objects
-        )
-        torch.save(
-            {
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "steps": int(step_counter),
-            },
-            f"./checkpoint.{epoch}.pth",
-        )
-    log.info("Done training for %d epochs", cfg.training.num_epochs)
+    with SigIntCatcher() as should_stop:
+        for epoch in range(cfg.training.num_epochs):
+            run_train_epoch(
+                cfg,
+                ds_train,
+                epoch,
+                model,
+                optimizer,
+                scheduler,
+                step_counter,
+                loss_fn_global,
+                loss_fn_objects,
+            )
+            run_val_epoch(
+                cfg, ds_val, epoch, model, step_counter, loss_fn_global, loss_fn_objects
+            )
+            run_viz(
+                cfg,
+                viz_batch,
+                epoch,
+                model,
+                step_counter,
+                loss_fn_global,
+                loss_fn_objects,
+            )
+            torch.save(
+                {
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "steps": int(step_counter),
+                },
+                f"./checkpoint.{epoch}.pth",
+            )
+            if should_stop:
+                break
+    log.info("Done training for %d/%d epochs", epoch + 1, cfg.training.num_epochs)
 
 
 def run_train_epoch(
@@ -693,14 +758,7 @@ def run_val_epoch(
 def run_viz(
     cfg, viz_batch, epoch, model, step_counter, loss_fn_global, loss_fn_objects
 ):
-    model.eval()
-
-    # TODO: log image for positional embedding
-
-    d = Path(f"viz_batch/epoch{epoch}")
-    d.mkdir(exist_ok=True, parents=True)
-
-    # Save input images
+    # region Prepare input images, save if it's the first epoch
     images = torch.from_numpy(np.copy(viz_batch)).to(cfg.other.device)
     images_np = (
         einops.rearrange(
@@ -711,32 +769,74 @@ def run_viz(
         .numpy()
     )
     if epoch == 0:
-        viz_batch = array_to_pil(
-            einops.rearrange(images_np, "B A H W C -> (A H) (B W) C")
+        array_to_pil(einops.rearrange(images_np, "B A H W C -> (A H) (B W) C")).save(
+            "viz_batch.png"
         )
-        viz_batch.save("viz_batch/viz_batch.png")
+    # endregion
 
-    # Forward pass and save attn matrices
+    # region Prepare dirs for epoch and image dict for wandb:
+    # - epoch0/*.png
+    # - epoch0/viz_batch/**/*.png
+    d = Path(f"epoch{epoch}/viz_batch")
+    d.mkdir(exist_ok=True, parents=True)
+    wandb_imgs = {}
+    # endregion
+
+    # region Positional embedding (downscaled)
+    num_patches = np.array(cfg.data.crop_size) // np.array(
+        cfg.model.backbone.patch_size
+    )
+    if isinstance(model.backbone.pos_embed, PositionalEmbedding):
+        fig = viz_positional_embedding(
+            model.backbone.pos_embed.embed,
+            num_patches=num_patches,
+            target_patches=(8, 8),
+        )
+        fig.savefig(f"epoch{epoch}/pos-embed-backbone.png", dpi=100)
+        plt.close(fig)
+        wandb_imgs["pos-embed/backbone"] = fig  # f"epoch{epoch}/pos-embed-backbone.png"
+    if isinstance(model.obj_fn.pos_embed, PositionalEmbedding):
+        fig = viz_positional_embedding(
+            model.obj_fn.pos_embed.embed,
+            num_patches=num_patches,
+            target_patches=(8, 8),
+        )
+        fig.savefig(f"epoch{epoch}/pos-embed-obj-fn.png", dpi=100)
+        plt.close(fig)
+        wandb_imgs["pos_embed/obj_fn"] = fig  # f"epoch{epoch}/pos-embed-obj-fn.png"
+    # endregion
+
+    # region Forward pass and save attn matrices
+    model.eval()
     with vit_slot_forward_with_attns(model) as f:
         (
             (f_backbone, f_global, f_slots, p_global, p_slots),
             vit_attns,
             slot_attns,
         ) = f(einops.rearrange(images, "A B C H W -> (A B) C H W"))
+    # endregion
 
-    # Global loss
+    # region Global loss
     l_global = loss_fn_global(f_global, f_slots, p_global, p_slots).item()
-    fig = viz_contrastive_loss_global(p_global, loss=l_global)
+    fig = viz_contrastive_loss_global_probs(
+        p_global, temp=cfg.losses.l_global.temp, loss=l_global
+    )
     fig.savefig(d / "contrastive-global.png", dpi=200)
+    wandb_imgs["viz_batch/l_global"] = fig
     plt.close(fig)
+    # endregion
 
-    # Object loss
+    # region Object loss
     l_objects = loss_fn_objects(f_global, f_slots, p_global, p_slots).item()
-    fig = viz_contrastive_loss_objects(p_slots, loss=l_objects)
+    fig = viz_contrastive_loss_objects_probs(
+        p_slots, temp=cfg.losses.l_objects.temp, loss=l_objects
+    )
     fig.savefig(d / "contrastive-objects.png", dpi=200)
+    wandb_imgs["viz_batch/l_objects"] = fig
     plt.close(fig)
+    # endregion
 
-    # Compute rollouts
+    # region Compute rollouts
     A = 2
     B = cfg.data.viz.max_samples
     S = cfg.model.obj_fn.num_objects
@@ -756,43 +856,26 @@ def run_viz(
         raise ValueError(cfg.model.architecture)
 
     vit_rollout = einops.reduce(vit_rollout, "AB Q K -> AB K", reduction="mean")
+    # endregion
 
-    # Reshape rollouts as images
+    # region Reshape rollouts as images
     K_h = K_w = int(np.sqrt(vit_rollout.shape[-1]))
+    shapes = {"A": A, "B": B, "K_h": K_h, "K_w": K_w}
     vit_rollout = einops.rearrange(
-        vit_rollout.cpu().numpy(),
-        "(A B) (K_h K_w) -> B A K_h K_w",
-        A=A,
-        B=B,
-        K_h=K_h,
-        K_w=K_w,
+        vit_rollout.cpu().numpy(), "(A B) (K_h K_w) -> B A K_h K_w", **shapes
     )
     global_rollout = einops.rearrange(
-        global_rollout.cpu().numpy(),
-        "(A B) (K_h K_w) -> B A K_h K_w",
-        A=A,
-        B=B,
-        K_h=K_h,
-        K_w=K_w,
+        global_rollout.cpu().numpy(), "(A B) (K_h K_w) -> B A K_h K_w", **shapes
     )
     slot_rollout = einops.rearrange(
-        slot_rollout.cpu().numpy(),
-        "(A B) S (K_h K_w) -> B A S K_h K_w",
-        A=A,
-        B=B,
-        K_h=K_h,
-        K_w=K_w,
+        slot_rollout.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
     )
     slot_rollout_full = einops.rearrange(
-        slot_rollout_full.cpu().numpy(),
-        "(A B) S (K_h K_w) -> B A S K_h K_w",
-        A=A,
-        B=B,
-        K_h=K_h,
-        K_w=K_w,
+        slot_rollout_full.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
     )
+    # endregion
 
-    # Compute K-means backbone
+    # region Compute K-means backbone
     if cfg.data.name == "CLEVR10":
         n_clusters = 11
         cmap = "tab20"
@@ -800,24 +883,21 @@ def run_viz(
         raise ValueError(cfg.data.name)
     vit_kmeans = kmeans_clusters(f_backbone, n_clusters)
     vit_kmeans = einops.rearrange(
-        vit_kmeans,
-        "(A B) (K_h K_w) -> B A K_h K_w",
-        A=A,
-        B=B,
-        K_h=K_h,
-        K_w=K_w,
+        vit_kmeans, "(A B) (K_h K_w) -> B A K_h K_w", **shapes
     )
-    vit_kmeans = plt.get_cmap(cmap)(vit_kmeans)[..., :3]
+    vit_kmeans = plt.get_cmap(cmap)(vit_kmeans)[..., :3]  # RGB not RGBA
+    # endregion
 
-    # Save individual images
-    wandb_imgs = {}
+    # region Save individual images
     for b, a in np.ndindex(B, A):
         Path(d / f"img{b}/aug{a}").mkdir(exist_ok=True, parents=True)
 
+        # Input image
         img = array_to_pil(images_np[b, a])
         img.save(d / f"img{b}/aug{a}/input.png")
         WH = img.size
 
+        # K-Means of backbone fetures
         kmeans = array_to_pil(vit_kmeans[b, a])
         kmeans.save(d / f"img{b}/aug{a}/vit.kmeans.png")
         kmeans = kmeans.resize(WH, resample=PilImage.NEAREST)
@@ -871,6 +951,7 @@ def run_viz(
         )
         grid.save(d / f"img{b}/aug{a}/summary.png")
         wandb_imgs[f"img{b}/aug{a}"] = grid
+    # endregion
 
     wandb.log(
         {k: wandb.Image(v) for k, v in wandb_imgs.items()},

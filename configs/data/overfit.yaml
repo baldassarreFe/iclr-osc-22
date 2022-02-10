@@ -1,0 +1,4 @@
+train:
+  max_samples: 6400
+val:
+  max_samples: 6400

@@ -7,9 +7,9 @@ from torch import nn as nn
 class MLP(nn.Module):
     def __init__(
         self,
-        in_features,
-        hidden_features=None,
-        out_features=None,
+        in_features: int,
+        hidden_features: int = None,
+        out_features: int = None,
         activation=nn.GELU,
         hidden_bias=True,
         out_bias=True,

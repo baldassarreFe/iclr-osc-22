@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn as nn
 
@@ -10,14 +11,15 @@ class SlotAttention(nn.Module):
         pos_embed=None,
         iters=3,
         eps=1e-8,
-        hidden_dim=128,
+        hidden_dim=None,
     ):
         super().__init__()
         self.num_slots = num_slots
-        self.iters = iters
+        self.num_iters = iters
         self.eps = eps
         self.scale = dim ** -0.5
-        hidden_dim = max(dim, hidden_dim)
+        if hidden_dim is None:
+            hidden_dim = dim
 
         if pos_embed is None or pos_embed == "none":
             pos_embed = nn.Identity()
@@ -26,9 +28,9 @@ class SlotAttention(nn.Module):
         self.slots_mu = nn.Parameter(torch.zeros(dim))
         self.slots_log_sigma = nn.Parameter(torch.zeros(dim))
 
-        self.to_q = nn.Linear(dim, dim)
-        self.to_k = nn.Linear(dim, dim)
-        self.to_v = nn.Linear(dim, dim)
+        self.to_q = nn.Linear(dim, dim, bias=False)
+        self.to_k = nn.Linear(dim, dim, bias=False)
+        self.to_v = nn.Linear(dim, dim, bias=False)
 
         self.gru = nn.GRUCell(dim, dim)
         self.dot_prod_softmax = SlotAttention.DotProdSoftmax()
@@ -46,8 +48,10 @@ class SlotAttention(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        nn.init.normal_(self.slots_mu)
-        nn.init.normal_(self.slots_log_sigma)
+        # glorot/xavier uniform initialization
+        limit = np.sqrt(6 / self.slots_mu.shape[-1])
+        nn.init.uniform_(self.slots_mu, -limit, +limit)
+        nn.init.uniform_(self.slots_log_sigma, -limit, +limit)
 
     # noinspection PyPep8Naming
     def _get_slots(self, B, K: int = None, seed: int = None):
@@ -56,7 +60,8 @@ class SlotAttention(nn.Module):
         if K is None:
             K = self.num_slots
 
-        if self.training:
+        # TODO: restore validation behavior
+        if True or self.training:
             # Use global rng unless seed is explicitly given
             rng = None if seed is None else torch.Generator(device).manual_seed(seed)
             # Sample B*K independent vectors of length C
@@ -84,22 +89,22 @@ class SlotAttention(nn.Module):
         k = self.to_k(inputs)
         v = self.to_v(inputs)
 
-        for i in range(self.iters):
+        for i in range(self.num_iters):
             slots_prev = slots
-
             slots = self.norm_slots(slots)
-            q = self.to_q(slots)
 
-            dots = torch.einsum("bid,bjd->bij", q, k) * self.scale
-            attn = dots.softmax(dim=1)
+            q = self.to_q(slots).mul(self.scale)
+            dots = torch.einsum("bid,bjd->bij", q, k)
+            attn = dots.softmax(dim=-2)
             attn = self.dot_prod_softmax(attn, i)
             attn = attn + self.eps
             attn = attn / attn.sum(dim=-1, keepdim=True)
 
             updates = torch.einsum("bjd,bij->bid", v, attn)
-            slots = self.gru(updates.reshape(-1, C), slots_prev.reshape(-1, C)).reshape(
-                B, -1, C
-            )
+            slots = self.gru(
+                updates.reshape(-1, C),
+                slots_prev.reshape(-1, C),
+            ).reshape(B, -1, C)
             slots = slots + self.mlp(self.norm_pre_ff(slots))
 
         return slots

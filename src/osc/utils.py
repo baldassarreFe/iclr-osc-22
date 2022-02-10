@@ -5,6 +5,8 @@ Collection of utilities.
 import inspect
 import logging
 import random
+import signal
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Mapping, Optional, Sequence, Tuple, Union
 
@@ -156,3 +158,47 @@ def latest_checkpoint(run_dir: Union[Path, str]) -> Path:
 @torch.jit.script
 def normalize_sum_to_one(tensor: torch.Tensor, dim: int = -1) -> torch.Tensor:
     return tensor / tensor.sum(dim=dim, keepdim=True).clamp_min(1e-8)
+
+
+class SigIntCatcher(AbstractContextManager):
+    """Context manager to gracefully handle SIGINT or KeyboardInterrupt.
+
+    Example:
+        Gracefully terminate a loop:
+
+        >>> with SigIntCatcher() as should_stop:
+        >>> for i in range(1000):
+        >>>     print(f"Step {i}...")
+        >>>     time.sleep(5)
+        >>>     print("Done")
+        >>>     if should_stop:
+        >>>         break
+    """
+
+    def __init__(self):
+        self._interrupted = None
+        self._old_handler = None
+
+    def __bool__(self):
+        return self._interrupted
+
+    def __enter__(self):
+        self._old_handler = signal.getsignal(signal.SIGINT)
+        self._interrupted = False
+        signal.signal(signal.SIGINT, self._handler)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        signal.signal(signal.SIGINT, self._old_handler)
+        self._interrupted = None
+        self._old_handler = None
+
+    def _handler(self, signum, frame):
+        if not self._interrupted:
+            log.warning(
+                "Interrupted, wait for graceful termination, repeat to raise exception"
+            )
+            self._interrupted = True
+        else:
+            log.warning("Interrupted again, raising exception")
+            raise KeyboardInterrupt()

@@ -23,8 +23,11 @@ def setup_wandb(cfg):
     hparams = filter_cfg_for_wandb(cfg)
     wandb.init(
         project=cfg.logging.project,
+        group=cfg.logging.group,
         id=cfg.logging.id,
         name=cfg.logging.name,
+        tags=cfg.logging.tags,
+        notes=cfg.logging.notes,
         config=hparams,
         mode="online" if not cfg.other.debug else "disabled",
     )

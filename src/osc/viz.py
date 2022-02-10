@@ -1,10 +1,10 @@
 """
 Visualization utils.
 """
-
 from collections import defaultdict
 from itertools import product
 from operator import itemgetter
+from pathlib import Path
 from typing import Sequence, Tuple, Union
 
 import einops
@@ -19,7 +19,11 @@ import sklearn.cluster
 import torch
 import torch.nn.functional
 from IPython.display import Image, display
+from matplotlib.axis import Axis
+from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from numpy.typing import NDArray
 
 import osc.data.clevr_with_masks
 import osc.rollout
@@ -119,11 +123,21 @@ def viz_positional_embedding(
     return fig
 
 
-def viz_contrastive_loss_global(x, loss: float):
-    # x: [2B C]
-    B = x.shape[0] // 2
+def viz_contrastive_loss_global(global_feats: torch.Tensor, loss: float) -> Figure:
+    """Visualize global contrastive loss between 2B images.
 
-    cos = osc.utils.cos_pairwise(x.detach().reshape(2 * B, -1))
+    Args:
+        global_feats: a tensor with shape [2B, C]
+        loss: loss value to show on the plot
+
+    Returns:
+        A figure with two axes.
+    """
+    A = 2
+    B = global_feats.shape[0] // A
+
+    # cos, prob: [AB AB]
+    cos = osc.utils.cos_pairwise(global_feats.detach().reshape(A * B, -1))
     prob = (
         torch.clone(cos)
         .fill_diagonal_(-torch.inf)
@@ -132,14 +146,12 @@ def viz_contrastive_loss_global(x, loss: float):
         .cpu()
         .numpy()
     )
-    acc = np.mean(np.nanargmax(prob, axis=1) == np.roll(np.arange(2 * B), B))
+    acc = np.mean(np.nanargmax(prob, axis=1) == np.roll(np.arange(A * B), B))
     cos = cos.fill_diagonal_(np.nan).cpu().numpy()
 
-    fig, axs = plt.subplots(
-        1, 2, figsize=(14, 7), sharex=True, sharey=True, squeeze=False
-    )
+    fig, axs = subplots_grid(1, 2, ax_height_inch=6, sharex=True, sharey=True)
 
-    ax = axs[0, 0]
+    ax = axs[0]
     img = ax.imshow(cos)
     fig.colorbar(img, ax=ax)
     ax.scatter(np.nanargmax(cos, axis=1), np.arange(2 * B), color="red")
@@ -148,7 +160,7 @@ def viz_contrastive_loss_global(x, loss: float):
         f"Min {np.nanmin(cos):.3f} Max {np.nanmax(cos):.3f} Loss {loss:.4f}"
     )
 
-    ax = axs[0, 1]
+    ax = axs[1]
     img = ax.imshow(prob)
     fig.colorbar(img, ax=ax, format=PercentFormatter(1.0))
     ax.scatter(np.nanargmax(prob, axis=1), np.arange(2 * B), color="red")
@@ -165,35 +177,109 @@ def viz_contrastive_loss_global(x, loss: float):
         ax.set_xticklabels(np.tile(np.arange(B), 2))
         ax.set_xlabel("Image idx")
 
-    ax = axs[0, 0]
+    ax = axs[0]
     ax.set_yticks(np.arange(2 * B))
     ax.set_yticklabels(np.tile(np.arange(B), 2))
     ax.set_ylabel("Image idx")
 
-    fig.set_facecolor("white")
     fig.tight_layout()
     return fig
 
 
-def match_objects(slots) -> np.ndarray:
-    B = slots.shape[0] // 2
-    K = slots.shape[1]
-    s0, s1 = torch.split(slots.detach(), B, dim=0)
+def viz_contrastive_loss_global_probs(
+    global_feats: torch.Tensor, temp: float, loss: float
+) -> Figure:
+    """Visualize global contrastive loss between 2B images, probabilities only.
+
+    Args:
+        global_feats: a tensor with shape [2B, C]
+        temp: loss temperature
+        loss: loss value to show on the plot
+
+    Returns:
+        A figure with a single plot of matching probabilities.
+    """
+    A = 2
+    B = global_feats.shape[0] // A
+
+    # cos, prob: [AB AB]
+    cos = osc.utils.cos_pairwise(global_feats.detach().reshape(A * B, -1))
+    prob = (
+        cos.div_(temp)
+        .fill_diagonal_(-torch.inf)
+        .softmax(dim=-1)
+        .fill_diagonal_(np.nan)
+        .cpu()
+        .numpy()
+    )
+    acc = np.mean(np.nanargmax(prob, axis=1) == np.roll(np.arange(A * B), B))
+
+    fig, ax = plt.subplots(1, 1, figsize=(1.7 * 2 * B, 1.7 * 2 * B))
+
+    img = ax.imshow(prob)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="1%", pad=0.1)
+    fig.colorbar(img, cax=cax, format=PercentFormatter(1.0))
+    ax.scatter(np.nanargmax(prob, axis=1), np.arange(2 * B), color="red")
+    ax.set_title(
+        f"Match probs of global projections (temp {temp:.2f})\n"
+        f"Min {np.nanmin(prob):.1%} Max {np.nanmax(prob):.1%} "
+        f"Acc {acc:.2%} Loss {loss:.4f}"
+    )
+
+    ax.axhline(B - 0.5, color="black", lw=4, ls="-")
+    ax.axvline(B - 0.5, color="black", lw=4, ls="-")
+
+    ax.set_xticks(np.arange(2 * B))
+    ax.set_xticklabels(np.tile(np.arange(B), 2))
+    ax.set_xlabel("Image idx")
+
+    ax.set_yticks(np.arange(2 * B))
+    ax.set_yticklabels(np.tile(np.arange(B), 2))
+    ax.set_ylabel("Image idx")
+
+    fig.tight_layout()
+    return fig
+
+
+def match_objects(obj_feats: torch.Tensor) -> np.ndarray:
+    """Compute matches between 2B images with S objects each.
+
+    Args:
+        obj_feats: object feature tensor of shape ``[2B S C]``,
+            where ``S`` is the number of objects per image.
+
+    Returns:
+        An array of matches (one match per row), length ``2BS``
+    """
+    B, S, C = obj_feats.shape
+    B //= 2
+    s0, s1 = obj_feats.detach().reshape(2, B, S, C).unbind(dim=0)
     cos = torch.einsum("ikc,ilc->ikl", s0, s1).cpu().numpy()
-    targets = np.zeros(2 * B * K, dtype=int)
+    targets = np.zeros(2 * B * S, dtype=int)
     for b in range(B):
-        # First output is a vector of sorted row idxs [0, 1, ..., K]
+        # First output is a vector of sorted row idxs [0, 1, ..., S]
         _, cols = scipy.optimize.linear_sum_assignment(cos[b, :, :], maximize=True)
-        targets[b * K : (b + 1) * K] = (B + b) * K + cols
-        targets[(B + b) * K : (B + b + 1) * K] = b * K + np.argsort(cols)
+        targets[b * S : (b + 1) * S] = (B + b) * S + cols
+        targets[(B + b) * S : (B + b + 1) * S] = b * S + np.argsort(cols)
     return targets
 
 
-def viz_contrastive_loss_objects(x, loss: float):
-    B = x.shape[0] // 2
-    S = x.shape[1]
+def viz_contrastive_loss_objects(obj_feats: torch.Tensor, loss: float) -> Figure:
+    """Visualize contrastive loss between 2B images with S objects each.
 
-    cos = osc.utils.cos_pairwise(x.detach().reshape(2 * B * S, -1))
+    Args:
+        obj_feats: object feature tensor of shape ``[2B S C]``,
+            where ``S`` is the number of objects per image.
+        loss: loss value to display on the plots
+
+    Returns:
+        A figure with two plots.
+    """
+    B = obj_feats.shape[0] // 2
+    S = obj_feats.shape[1]
+
+    cos = osc.utils.cos_pairwise(obj_feats.detach().reshape(2 * B * S, -1))
     prob = (
         torch.clone(cos)
         .fill_diagonal_(-torch.inf)
@@ -203,13 +289,11 @@ def viz_contrastive_loss_objects(x, loss: float):
         .numpy()
     )
     cos = cos.fill_diagonal_(np.nan).cpu().numpy()
-    matches = match_objects(x)
+    matches = match_objects(obj_feats)
 
-    fig, axs = plt.subplots(
-        1, 2, figsize=12 * np.array([2, 1]), sharex=True, sharey=True, squeeze=False
-    )
+    fig, axs = subplots_grid(1, 2, ax_height_inch=2 * B, sharex=True, sharey=True)
 
-    ax = axs[0, 0]
+    ax = axs[0]
     img = ax.imshow(cos)
     fig.colorbar(img, ax=ax)
     ax.set_title(
@@ -218,7 +302,7 @@ def viz_contrastive_loss_objects(x, loss: float):
     )
     ax.scatter(matches, np.arange(2 * B * S), color="red", s=10)
 
-    ax = axs[0, 1]
+    ax = axs[1]
     img = ax.imshow(prob)
     fig.colorbar(img, ax=ax, format=PercentFormatter(1.0))
     ax.set_title(
@@ -228,24 +312,94 @@ def viz_contrastive_loss_objects(x, loss: float):
     ax.scatter(matches, np.arange(2 * B * S), color="red", s=10)
 
     for ax in axs.flat:
-        ax.axhline(B * S - 0.5, color="black", lw=4, ls="--")
-        ax.axvline(B * S - 0.5, color="black", lw=4, ls="--")
-        for b in range(1, 2 * B):
-            ax.axhline(b * S - 0.5, color="black", lw=2)
-            ax.axvline(b * S - 0.5, color="black", lw=2)
+        ax.axhline(B * S - 0.5, color="black", lw=4)
+        ax.axvline(B * S - 0.5, color="black", lw=4)
+        for line in range(S, 2 * B * S, S):
+            ax.axhline(line - 0.5, color="black", lw=2)
+            ax.axvline(line - 0.5, color="black", lw=2)
+
+        ax.set_xlabel("Image idx | slot idx")
         ax.set_xticks(np.arange(2 * B * S))
         ax.set_xticklabels(
             2 * [k if k > 0 else f"img {b} | {k}" for b in range(B) for k in range(S)],
             rotation=90,
+            fontdict={"fontsize": "small"},
         )
-        ax.set_xlabel("Image idx | slot idx")
 
-    ax = axs[0, 0]
+    ax = axs[0]
     ax.set_yticks(np.arange(2 * B * S))
     ax.set_yticklabels(
-        2 * [s if s > 0 else f"img {b} | {s}" for b in range(B) for s in range(S)]
+        2 * [s if s > 0 else f"img {b} | {s}" for b in range(B) for s in range(S)],
+        fontdict={"fontsize": "small"},
     )
     ax.set_ylabel("Image idx | slot idx")
+
+    fig.set_facecolor("white")
+    fig.tight_layout()
+    return fig
+
+
+def viz_contrastive_loss_objects_probs(
+    obj_feats: torch.Tensor, temp: float, loss: float
+) -> Figure:
+    """Visualize contrastive loss between 2B images with S objects each, probabilities only.
+
+    Args:
+        obj_feats: object feature tensor of shape ``[2B S C]``,
+            where ``S`` is the number of objects per image.
+        temp: loss temperature
+        loss: loss value to display on the plots
+
+    Returns:
+        A figure with a single plot of matching probabilities.
+    """
+    B = obj_feats.shape[0] // 2
+    S = obj_feats.shape[1]
+
+    cos = osc.utils.cos_pairwise(obj_feats.detach().reshape(2 * B * S, -1))
+    prob = (
+        cos.div_(temp)
+        .fill_diagonal_(-torch.inf)
+        .softmax(dim=-1)
+        .fill_diagonal_(np.nan)
+        .cpu()
+        .numpy()
+    )
+
+    fig, ax = plt.subplots(1, 1, figsize=(1.7 * 2 * B, 1.7 * 2 * B))
+
+    img = ax.imshow(prob)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="1%", pad=0.1)
+    fig.colorbar(img, cax=cax, format=PercentFormatter(1.0))
+
+    matches = match_objects(obj_feats)
+    ax.scatter(matches, np.arange(2 * B * S), color="red", s=10)
+    ax.set_title(
+        f"Match probs of slot projections (temp {temp:.2f})\n"
+        f"Min {np.nanmin(prob):.1%} Max {np.nanmax(prob):.1%} Loss {loss:.4f}"
+    )
+
+    ax.axhline(B * S - 0.5, color="black", lw=4)
+    ax.axvline(B * S - 0.5, color="black", lw=4)
+    for line in range(S, 2 * B * S, S):
+        ax.axhline(line - 0.5, color="black", lw=2)
+        ax.axvline(line - 0.5, color="black", lw=2)
+
+    ax.set_xlabel("Image idx | slot idx")
+    ax.set_xticks(np.arange(2 * B * S))
+    ax.set_xticklabels(
+        2 * [k if k > 0 else f"img {b} | {k}" for b in range(B) for k in range(S)],
+        rotation=90,
+        fontdict={"fontsize": "small"},
+    )
+
+    ax.set_ylabel("Image idx | slot idx")
+    ax.set_yticks(np.arange(2 * B * S))
+    ax.set_yticklabels(
+        2 * [s if s > 0 else f"img {b} | {s}" for b in range(B) for s in range(S)],
+        fontdict={"fontsize": "small"},
+    )
 
     fig.set_facecolor("white")
     fig.tight_layout()
@@ -635,7 +789,7 @@ def array_to_pil(
     if img.ndim == 2:
         if any(img.dtype == t for t in [np.float, np.float32, np.float64]):
             if scale_range:
-                img = (img - img.min()) / (img.max() - img.min())
+                img = (img - img.min()) / (img.max() - img.min() + 1e-8)
             img = plt.get_cmap(cmap)(img)[..., :3]  # RGB only, no RGBA
             img = np.cast[np.uint8](img * 255)
         if img.dtype == np.uint8:
@@ -659,10 +813,6 @@ def text_html(text, rot=0, align="center"):
     return (
         f'<div style="text-align: {align}; transform: rotate({rot}deg);">{text}<div/>'
     )
-
-
-def vtext(text):
-    return text_html(text, rot=-90)
 
 
 def batched_otsu(x: np.ndarray):
@@ -707,3 +857,35 @@ def make_grid_pil(grid: Sequence[Sequence[PilImage.Image]]):
     grid = [row + (ncols - len(row)) * [np.zeros_like(row[0])] for row in grid]
     grid = np.concatenate([np.concatenate(row, axis=1) for row in grid], axis=0)
     return PilImage.fromarray(grid)
+
+
+def subplots_grid(
+    nrows: int = 1,
+    ncols: int = 1,
+    ax_aspect_hw: Tuple[int, int] = (1, 1),
+    ax_height_inch: float = 4.0,
+    dpi: int = 200,
+    **kwargs,
+) -> Tuple[Figure, NDArray[Axis]]:
+    figsize_wh = (
+        ax_height_inch * ncols * ax_aspect_hw[1] / ax_aspect_hw[0],
+        ax_height_inch * nrows,
+    )
+    fig, axs = plt.subplots(nrows, ncols, figsize=figsize_wh, dpi=dpi, **kwargs)
+    fig.set_facecolor("white")
+    return fig, axs
+
+
+def remove_xyticks(axs: NDArray[Axis], keep_bottom_left=True):
+    if keep_bottom_left:
+        axs = axs[:-1, 1:]
+    for ax in axs.flat:
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+
+def fig_save_display(fig: Figure, path: Union[str, Path], dpi=100, width=400):
+    fig.set_facecolor("white")
+    fig.savefig(path, dpi=dpi)
+    plt.close(fig)
+    display(Image(url=path, width=width))

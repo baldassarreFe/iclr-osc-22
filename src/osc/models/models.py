@@ -1,12 +1,11 @@
 from contextlib import contextmanager
 from typing import Dict, List, Union
 
-import timm.models.layers
-import timm.models.vision_transformer
 import torch
 import torch.nn as nn
 from torch.utils.hooks import RemovableHandle
 
+from .attentions import SelfAttentionBlock
 from .slot_attention import SlotAttention
 
 
@@ -81,7 +80,7 @@ def vit_slot_forward_with_attns(model: Union[VitGlobalSlotModel, VitSlotGlobalMo
 
     handles: List[RemovableHandle] = []
     for name, module in model.named_modules():
-        if isinstance(module, timm.models.vision_transformer.Block):
+        if isinstance(module, SelfAttentionBlock):
             module_to_name[module.attn.attn_drop] = name
             handle = module.attn.attn_drop.register_forward_pre_hook(vit_hook)
             handles.append(handle)

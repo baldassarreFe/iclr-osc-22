@@ -1,0 +1,15 @@
+root: '~/multi-object-datasets'
+name: CLEVR10
+crop_size: [128, 128]
+normalize:
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+train:
+  seed: null # defaults to random
+  max_samples: null # defaults to all
+val:
+  seed: 6676759028237078
+  max_samples: null # defaults to all
+viz:
+  seed: 6676759028237078
+  max_samples: 4
