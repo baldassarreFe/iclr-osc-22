@@ -29,17 +29,16 @@ from osc.loss_objects import (
     matching_contrastive_loss_per_img,
 )
 from osc.lr_scheduler import LinearWarmupCosineAnneal
-from osc.models import (
-    MLP,
+from osc.models.attentions import SlotAttention
+from osc.models.embeds import (
+    KmeansEuclideanObjectTokens,
+    LearnedObjectTokens,
     PositionalEmbedding,
-    SlotAttention,
-    ViTBackbone,
-    VitGlobalSlotModel,
-    VitSlotGlobalModel,
-    global_avg_pool,
-    global_max_pool,
+    SampledObjectTokens,
 )
-from osc.models.models import vit_slot_forward_with_attns
+from osc.models.models import Model, vit_slot_forward_with_attns
+from osc.models.utils import MLP
+from osc.models.vit import ViTBackbone
 from osc.rollout import self_attn_rollout, slot_attn_rollout
 from osc.utils import SigIntCatcher, batches_per_epoch, seed_everything
 from osc.viz import (
@@ -205,22 +204,17 @@ def build_model(cfg):
         block_attn_drop=cfg.model.backbone.block_attn_drop,
         drop_path=cfg.model.backbone.drop_path,
         mlp_ratio=cfg.model.backbone.mlp_ratio,
+        global_pool=cfg.model.backbone.global_pool,
     )
 
-    global_fn = torch.nn.Sequential(
-        {
-            "avg": global_avg_pool,
-            "max": global_max_pool,
-        }[cfg.model.global_fn.pooling],
-        MLP(
-            in_features=cfg.model.backbone.embed_dim,
-            hidden_features=int(
-                np.round(cfg.model.global_fn.hidden_mult * cfg.model.backbone.embed_dim)
-            ),
-            out_features=cfg.model.backbone.embed_dim,
-            activation=activations[cfg.model.global_fn.activation],
-            dropout=0.0,
+    global_fn = MLP(
+        in_features=cfg.model.backbone.embed_dim,
+        hidden_features=int(
+            np.round(cfg.model.global_fn.hidden_mult * cfg.model.backbone.embed_dim)
         ),
+        out_features=cfg.model.backbone.embed_dim,
+        activation=activations[cfg.model.global_fn.activation],
+        dropout=0.0,
     )
 
     global_proj = MLP(
@@ -234,21 +228,32 @@ def build_model(cfg):
         dropout=0.0,
     )
 
+    if cfg.model.obj_queries.name == "sample":
+        obj_queries = SampledObjectTokens(
+            embed_dim=cfg.model.backbone.embed_dim,
+            num_objects=cfg.model.obj_queries.num_objects,
+        )
+    elif cfg.model.obj_queries.name == "learned":
+        obj_queries = LearnedObjectTokens(
+            embed_dim=cfg.model.backbone.embed_dim,
+            num_objects=cfg.model.obj_queries.num_objects,
+        )
+    elif cfg.model.obj_queries.name == "kmeans_euclidean":
+        obj_queries = KmeansEuclideanObjectTokens(
+            num_objects=cfg.model.obj_queries.num_objects
+        )
+    else:
+        raise ValueError(cfg.model.obj_queries.name)
+
     if cfg.model.obj_fn.name == "slot-attention":
-        if cfg.model.obj_fn.queries == "sample":
-            obj_fn = SlotAttention(
-                num_slots=cfg.model.obj_fn.num_objects,
-                dim=cfg.model.backbone.embed_dim,
-                pos_embed=obj_fn_pos_embed,
-                iters=cfg.model.obj_fn.num_iters,
-                hidden_dim=int(
-                    np.round(
-                        cfg.model.obj_fn.hidden_mult * cfg.model.backbone.embed_dim
-                    )
-                ),
-            )
-        else:
-            raise ValueError(cfg.model.obj_fn.queries)
+        obj_fn = SlotAttention(
+            dim=cfg.model.backbone.embed_dim,
+            pos_embed=obj_fn_pos_embed,
+            iters=cfg.model.obj_fn.num_iters,
+            hidden_dim=int(
+                np.round(cfg.model.obj_fn.hidden_mult * cfg.model.backbone.embed_dim)
+            ),
+        )
     else:
         raise ValueError(cfg.model.obj_fn.name)
 
@@ -261,26 +266,15 @@ def build_model(cfg):
         dropout=0.0,
     )
 
-    if cfg.model.architecture == "backbone(-global_fn-global_proj)-obj_fn-obj_proj":
-        return VitGlobalSlotModel(
-            backbone=backbone,
-            global_fn=global_fn,
-            obj_fn=obj_fn,
-            global_proj=global_proj,
-            obj_proj=obj_proj,
-        )
-
-    elif cfg.model.architecture == "backbone-obj_fn(-global_fn-global_proj)-obj_proj":
-        return VitSlotGlobalModel(
-            backbone=backbone,
-            global_fn=global_fn,
-            obj_fn=obj_fn,
-            global_proj=global_proj,
-            obj_proj=obj_proj,
-        )
-
-    else:
-        raise ValueError(cfg.model.architecture)
+    return Model(
+        architecture=cfg.model.architecture,
+        backbone=backbone,
+        global_fn=global_fn,
+        global_proj=global_proj,
+        obj_queries=obj_queries,
+        obj_fn=obj_fn,
+        obj_proj=obj_proj,
+    )
 
 
 def build_optimizer(cfg, model):
@@ -306,6 +300,7 @@ def build_scheduler(cfg, optimizer):
         raise ValueError(cfg.lr_scheduler.decay.name)
 
 
+# noinspection PyUnusedLocal
 def build_losses(cfg):
     if cfg.losses.l_global.name == "sim":
 
@@ -839,15 +834,25 @@ def run_viz(
     # region Compute rollouts
     A = 2
     B = cfg.data.viz.max_samples
-    S = cfg.model.obj_fn.num_objects
+    S = cfg.model.obj_queries.num_objects
 
     vit_rollout = self_attn_rollout(vit_attns, global_avg_pool=False)
+    if cfg.model.backbone.global_pool == "cls":
+        # split and re-normalize vit_rollout: [AB 1+Q 1+K] -> [AB 1 K], [AB Q K]
+        global_rollout = vit_rollout[:, 0, 1:]
+        global_rollout /= global_rollout.sum(dim=-1, keepdim=True)
+        vit_rollout = vit_rollout[:, 1:, 1:]
+        vit_rollout /= vit_rollout.sum(dim=-1, keepdim=True)
+    elif cfg.model.backbone.global_pool == "avg":
+        global_rollout = einops.reduce(vit_rollout, "AB Q K -> AB K", reduction="mean")
+    else:
+        raise ValueError(cfg.model.backbone.global_pool)
 
     slot_rollout = slot_attn_rollout(slot_attns)
     slot_rollout_full = torch.bmm(slot_rollout, vit_rollout)
 
     if cfg.model.architecture == "backbone(-global_fn-global_proj)-obj_fn-obj_proj":
-        global_rollout = einops.reduce(vit_rollout, "AB Q K -> AB K", reduction="mean")
+        global_rollout = global_rollout
     elif cfg.model.architecture == "backbone-obj_fn(-global_fn-global_proj)-obj_proj":
         global_rollout = einops.reduce(
             slot_rollout_full, "AB S K -> AB K", reduction="mean"
@@ -904,12 +909,21 @@ def run_viz(
 
         # ViT backbone, one img per head + avg head
         for lyr, k in enumerate(sorted(vit_attns.keys())):
-            for h in range(vit_attns[k].shape[1]):
-                array_to_pil(
-                    vit_attns[k][a * B + b, h].mean(axis=0).reshape(K_h, K_w)
-                ).save(d / f"img{b}/aug{a}/vit.block{lyr}.head{h}.png")
+            attns = vit_attns[k]
+            if cfg.model.backbone.global_pool == "cls":
+                # split and re-normalize attns: [AB head 1+Q 1+K] -> [AB head Q K]
+                attns = attns[:, :, 1:, 1:]
+                attns = attns / attns.sum(dim=-1, keepdim=True)
+            elif cfg.model.backbone.global_pool == "avg":
+                pass
+            else:
+                raise ValueError(cfg.model.backbone.global_pool)
+            for h in range(attns.shape[1]):
+                array_to_pil(attns[a * B + b, h].mean(axis=0).reshape(K_h, K_w)).save(
+                    d / f"img{b}/aug{a}/vit.block{lyr}.head{h}.png"
+                )
             array_to_pil(
-                vit_attns[k][a * B + b].mean(axis=(0, 1)).reshape(K_h, K_w),
+                attns[a * B + b].mean(axis=(0, 1)).reshape(K_h, K_w),
                 cmap="inferno",
             ).save(d / f"img{b}/aug{a}/vit.block{lyr}.mean.png")
 

@@ -1,5 +1,6 @@
 import numpy as np
 import opt_einsum
+import torch
 from einops.layers.torch import Rearrange
 from timm.models.layers import DropPath, Mlp
 from torch import nn
@@ -107,7 +108,97 @@ class CrossAttention(nn.Module):
         return out
 
 
+class SlotAttention(nn.Module):
+    def __init__(
+        self,
+        dim,
+        pos_embed=None,
+        iters=3,
+        eps=1e-8,
+        hidden_dim=None,
+    ):
+        super().__init__()
+        self.num_iters = iters
+        self.eps = eps
+        self.scale = np.sqrt(dim)
+        if hidden_dim is None:
+            hidden_dim = dim
+
+        if pos_embed is None or pos_embed == "none":
+            pos_embed = nn.Identity()
+        self.pos_embed = pos_embed
+
+        self.to_q = nn.Linear(dim, dim, bias=False)
+        self.to_k = nn.Linear(dim, dim, bias=False)
+        self.to_v = nn.Linear(dim, dim, bias=False)
+
+        # Dummy module to get the attn matrix with a pre-forward hook
+        self.dot_prod_softmax = nn.Identity()
+
+        self.gru = nn.GRUCell(dim, dim)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden_dim, dim),
+        )
+
+        self.norm_input = nn.LayerNorm(dim)
+        self.norm_slots = nn.LayerNorm(dim)
+        self.norm_pre_ff = nn.LayerNorm(dim)
+
+    def forward(self, slots: torch.Tensor, inputs: torch.Tensor):
+        B, S, C = slots.shape
+        B, N, C = inputs.shape
+
+        inputs = self.pos_embed(inputs)
+        inputs = self.norm_input(inputs)
+        k = self.to_k(inputs)
+        v = self.to_v(inputs)
+
+        for i in range(self.num_iters):
+            slots_prev = slots
+            slots = self.norm_slots(slots)
+
+            q = self.to_q(slots).div_(self.scale)
+            dots = torch.einsum("bqd,bkd->bqk", q, k)
+            attn = dots.softmax(dim=-2)
+            attn, _ = self.dot_prod_softmax((attn, i))
+            attn = attn + self.eps
+            attn = attn / attn.sum(dim=-1, keepdim=True)
+
+            updates = torch.einsum("bjd,bij->bid", v, attn)
+            slots = self.gru(
+                updates.reshape(-1, C),
+                slots_prev.reshape(-1, C),
+            ).reshape(B, -1, C)
+            slots = slots + self.mlp(self.norm_pre_ff(slots))
+
+        return slots
+
+
 class SelfAttentionBlock(nn.Module):
+    """Self attention block
+
+    Diagram::
+
+         ┌───┤
+         │   ▼
+         │ norm
+         │   ▼
+         │ attn
+         │   ▼
+         └──►+
+         ┌───┤
+         │   ▼
+         │ norm
+         │   ▼
+         │  MLP
+         │   ▼
+         └──►+
+             ▼
+    """
+
     # Reference implementation: timm.models.vision_transformer.Block
     def __init__(
         self,
@@ -132,10 +223,9 @@ class SelfAttentionBlock(nn.Module):
         )
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm2 = norm_layer(dim)
-        mlp_hidden_dim = int(np.round(dim * mlp_ratio))
         self.mlp = Mlp(
             in_features=dim,
-            hidden_features=mlp_hidden_dim,
+            hidden_features=int(np.round(dim * mlp_ratio)),
             act_layer=act_layer,
             drop=drop,
         )
@@ -161,7 +251,8 @@ class CrossAttentionBlock(nn.Module):
         norm_layer=nn.LayerNorm,
     ):
         super().__init__()
-        self.norm1 = norm_layer(dim)
+        self.norm1_x = norm_layer(dim)
+        self.norm1_ctx = norm_layer(dim)
         self.attn = CrossAttention(
             dim,
             num_heads=num_heads,
@@ -171,16 +262,15 @@ class CrossAttentionBlock(nn.Module):
         )
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm2 = norm_layer(dim)
-        mlp_hidden_dim = int(np.round(dim * mlp_ratio))
         self.mlp = Mlp(
             in_features=dim,
-            hidden_features=mlp_hidden_dim,
+            hidden_features=int(np.round(dim * mlp_ratio)),
             act_layer=act_layer,
             drop=drop,
         )
 
     def forward(self, x, ctx):
-        x = x + self.drop_path(self.attn(self.norm1(x), self.norm1(ctx)))
+        x = x + self.drop_path(self.attn(self.norm1_x(x), self.norm1_ctx(ctx)))
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 

@@ -20,6 +20,7 @@ class ViTBackbone(nn.Module):
         block_attn_drop: float = 0.0,
         drop_path: float = 0.0,
         mlp_ratio: float = 4.0,
+        global_pool: str = "cls"
     ):
         super().__init__()
 
@@ -57,10 +58,19 @@ class ViTBackbone(nn.Module):
             ]
         )
 
+        if global_pool == "cls":
+            self.cls_token = nn.Parameter(torch.zeros(embed_dim))
+        elif global_pool == "avg":
+            self.cls_token = None
+        else:
+            raise ValueError(global_pool)
+
         self.init_weights()
 
     def init_weights(self):
         # noinspection PyProtectedMember
+        if self.cls_token is not None:
+            timm.models.layers.trunc_normal_(self.cls_token, std=0.02)
         self.apply(timm.models.vision_transformer._init_vit_weights)
 
     def forward(self, images: torch.Tensor):
@@ -70,12 +80,28 @@ class ViTBackbone(nn.Module):
             images: tensor of shape ``[B 3 H W]``
 
         Returns:
-            Features of shape ``[B N C]``, where ``N = HW // patch_area``.
+            Global features of shape ``[B C]``.
+            Patch features of shape``[B N C]``, where ``N = HW // patch_area``.
             The output is not L2 normalized.
         """
+        B = images.shape[0]
         x = self.patch_emb(images)
+        if self.cls_token is not None:
+            cls_token = self.cls_token.expand(B, 1, -1)
+            x = torch.cat([cls_token, x], dim=1)
+
         for i, block in enumerate(self.attn_blocks):
             if i == 0 or self.pos_embed_every_layer:
-                x = self.pos_embed(x)
+                if self.cls_token is not None:
+                    x = torch.cat([x[:, :1, :], self.pos_embed(x[:, 1:, :])], dim=1)
+                else:
+                    x = self.pos_embed(x)
             x = block(x)
-        return x
+
+        if self.cls_token is not None:
+            f_global = x[:, 0, :]
+            f_backbone = x[:, 1:, :]
+        else:
+            f_global = torch.mean(x, dim=1)
+            f_backbone = x
+        return f_global, f_backbone
