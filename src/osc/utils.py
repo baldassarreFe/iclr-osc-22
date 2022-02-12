@@ -99,21 +99,24 @@ def l2_normalize(a: torch.Tensor) -> torch.Tensor:
 
 @torch.jit.script
 def cos_pairwise(a: torch.Tensor, b: Optional[torch.Tensor] = None) -> torch.Tensor:
-    """Pairwise cosine between the rows of two matrices.
+    """Cosine between all pairs of entries in two tensors.
 
     Args:
-        a: [N, C] tensor.
-        b: [M, C] tensor, defaults to ``a`` if missing.
+        a: [*N, C] tensor, where ``*N`` can be any number of leading dimensions.
+        b: [*M, C] tensor, where ``*M`` can be any number of leading dimensions.
+            Defaults to ``a`` if missing.
 
     Returns:
-        [N, M] tensor of cosine values.
+        [*N, *M] tensor of cosine values.
     """
     a = l2_normalize(a)
-    if b is not None:
-        b = l2_normalize(b)
-    else:
-        b = a
-    return torch.einsum("ic,jc->ij", a, b)
+    b = a if b is None else l2_normalize(b)
+    N = a.shape[:-1]
+    M = b.shape[:-1]
+    a = a.flatten(end_dim=-2)
+    b = b.flatten(end_dim=-2)
+    cos = torch.einsum("nc,mc->nm", a, b)
+    return cos.reshape(N + M)
 
 
 def batches_per_epoch(num_samples: int, batch_size: int, drop_last: bool) -> int:
@@ -137,7 +140,7 @@ def seed_everything(seed: int):
     random.seed(seed)
     torch.manual_seed(seed)
     tf.random.set_seed(seed)
-    np.random.seed(seed // 2 ** 32)
+    np.random.seed(np.cast[np.uint32](seed))
     log.info("All random seeds: %d", seed)
 
 
@@ -193,6 +196,7 @@ class SigIntCatcher(AbstractContextManager):
         self._interrupted = None
         self._old_handler = None
 
+    # noinspection PyUnusedLocal
     def _handler(self, signum, frame):
         if not self._interrupted:
             log.warning(

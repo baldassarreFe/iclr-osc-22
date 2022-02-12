@@ -48,8 +48,8 @@ def filter_cfg_for_wandb(cfg, exclude=None):
     cfg = OmegaConf.to_container(cfg, resolve=True)
     if exclude is None:
         exclude = EXCLUDE_HPARAMS
-    for k in exclude:
-        delete_(cfg, k)
+    for key in exclude:
+        delete_(cfg, key)
     return cfg
 
 

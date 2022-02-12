@@ -3,7 +3,7 @@ from typing import Tuple
 import numpy as np
 import scipy.optimize
 import torch
-import torch.nn.functional as F
+from torch.nn.functional import cross_entropy
 
 from osc.utils import cos_pairwise, l2_normalize
 
@@ -111,7 +111,7 @@ def matching_contrastive_loss(
     targets = torch.from_numpy(targets).to(slots.device)
 
     cos = cos.reshape(A * B * K, A * B * K).div_(temperature).fill_diagonal_(-torch.inf)
-    loss = F.cross_entropy(cos, targets, reduction=reduction)
+    loss = cross_entropy(cos, targets, reduction=reduction)
 
     # Debug
     # with np.printoptions(linewidth=150, formatter={"bool": ".X".__getitem__}):
@@ -255,7 +255,7 @@ def matching_contrastive_loss_per_img(
         ],
         dim=0,
     )
-    loss = F.cross_entropy(cos, targets, reduction=reduction)
+    loss = cross_entropy(cos, targets, reduction=reduction)
 
     # Debug
     # with np.printoptions(linewidth=150, formatter={"bool": ".X".__getitem__}):
