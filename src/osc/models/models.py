@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Dict, List
+from typing import Dict, List, NamedTuple
 
 import torch
 import torch.nn as nn
@@ -12,6 +12,26 @@ from .embeds import (
     LearnedObjectTokens,
     SampledObjectTokens,
 )
+
+
+class ModelOutput(NamedTuple):
+    """Model output.
+
+    Fields:
+
+    - f_backbone: backbone features, shape ``[B N C]``
+    - f_global: global features, shape ``[B C]``
+    - f_slots: object features, shape ``[B C]``
+    - p_global: global projections, shape ``[B S C]``
+    - p_slots: object projections shape ``[B S C]``
+
+    """
+
+    f_backbone: torch.Tensor
+    f_global: torch.Tensor
+    f_slots: torch.Tensor
+    p_global: torch.Tensor
+    p_slots: torch.Tensor
 
 
 class Model(nn.Module):
@@ -38,7 +58,7 @@ class Model(nn.Module):
         self.obj_fn = obj_fn
         self.obj_proj = obj_proj
 
-    def forward(self, images):
+    def forward(self, images: torch.Tensor) -> ModelOutput:
         # images: B 3 H W
         B = images.shape[0]
 
@@ -72,7 +92,7 @@ class Model(nn.Module):
         f_global = self.global_fn(f_global)
         p_global = self.global_proj(f_global)
 
-        return f_backbone, f_global, f_slots, p_global, p_slots
+        return ModelOutput(f_backbone, f_global, f_slots, p_global, p_slots)
 
 
 @contextmanager

@@ -4,13 +4,14 @@ import time
 from functools import partial
 from itertools import islice
 from pathlib import Path
+from typing import Iterable, List, Optional, Protocol, Tuple
 
 import einops
 import hydra
 import namesgenerator
 import numpy as np
 import omegaconf
-import PIL.Image as PilImage
+import PIL.Image
 import tabulate
 import tensorflow as tf
 import torch
@@ -36,19 +37,16 @@ from osc.models.embeds import (
     PositionalEmbedding,
     SampledObjectTokens,
 )
-from osc.models.models import Model, vit_slot_forward_with_attns
+from osc.models.models import Model, ModelOutput, vit_slot_forward_with_attns
 from osc.models.utils import MLP
 from osc.models.vit import ViTBackbone
-from osc.rollout import self_attn_rollout, slot_attn_rollout
-from osc.utils import SigIntCatcher, batches_per_epoch, seed_everything
-from osc.viz import (
-    array_to_pil,
-    kmeans_clusters,
-    make_grid_pil,
-    viz_contrastive_loss_global_probs,
-    viz_contrastive_loss_objects_probs,
-    viz_positional_embedding,
-)
+from osc.utils import SigIntCatcher, StepCounter, batches_per_epoch, seed_everything
+from osc.viz.backbone import kmeans_clusters
+from osc.viz.embeds import viz_positional_embedding
+from osc.viz.loss_global import viz_contrastive_loss_global_probs
+from osc.viz.loss_objects import viz_contrastive_loss_objects_probs
+from osc.viz.rollout import self_attn_rollout, slot_attn_rollout
+from osc.viz.utils import array_to_pil, make_grid_pil
 from osc.wandb_utils import setup_wandb
 
 log = logging.getLogger(__name__)
@@ -68,16 +66,7 @@ def main(cfg: DictConfig) -> None:
     viz_batch = get_viz_batch(cfg)
 
     model = build_model(cfg).to(cfg.other.device)
-    log.info(
-        "Model parameters:\n%s",
-        tabulate.tabulate(
-            [
-                [name, sum(p.numel() for p in child.parameters() if p.requires_grad)]
-                for name, child in model.named_children()
-            ],
-            headers=["Module", "Parameters"],
-        ),
-    )
+    log_model_parameters(model)
 
     optimizer = build_optimizer(cfg, model)
     scheduler = build_scheduler(cfg, optimizer)
@@ -159,7 +148,8 @@ def update_cfg(cfg: DictConfig, readonly=True):
     return result
 
 
-def build_model(cfg):
+def build_model(cfg: DictConfig) -> Model:
+    """Build model"""
     num_patches = np.array(cfg.data.crop_size) // np.array(
         cfg.model.backbone.patch_size
     )
@@ -277,7 +267,31 @@ def build_model(cfg):
     )
 
 
-def build_optimizer(cfg, model):
+def log_model_parameters(model: torch.nn.Module):
+    """Log model parameters as a table. First level only."""
+    table = [
+        [
+            name,
+            child.__class__.__name__,
+            sum(p.numel() for p in child.parameters() if p.requires_grad),
+        ]
+        for name, child in model.named_children()
+    ]
+    table.append(["TOTAL", "", sum(r[-1] for r in table)])
+    table = tabulate.tabulate(table, headers=["Module", "Class", "Parameters"])
+    log.info("Model parameters:\n%s", table)
+
+
+def build_optimizer(cfg: DictConfig, model: torch.nn.Module) -> torch.optim.Optimizer:
+    """Build optimizer for training.
+
+    Args:
+        cfg: configuration
+        model: model
+
+    Returns:
+        An optimizer.
+    """
     if cfg.optimizer.name == "adam":
         return torch.optim.AdamW(
             model.parameters(),
@@ -300,20 +314,33 @@ def build_scheduler(cfg, optimizer):
         raise ValueError(cfg.lr_scheduler.decay.name)
 
 
-# noinspection PyUnusedLocal
-def build_losses(cfg):
+class ModelLoss(Protocol):
+    """Function type signature for model loss functions."""
+
+    def __call__(
+        self, output: ModelOutput, *, reduction: Optional[str] = "mean"
+    ) -> torch.Tensor:
+        ...
+
+
+def build_losses(
+    cfg: DictConfig,
+) -> Tuple[ModelLoss, ModelLoss]:
+    """Build global and object losses."""
     if cfg.losses.l_global.name == "sim":
 
-        def loss_fn_global(f_global, f_slots, p_global, p_slots, reduction="mean"):
-            del f_slots, p_slots
-            return cosine_sim_loss(f_global, p_global, reduction=reduction)
+        def loss_fn_global(output: ModelOutput, *, reduction="mean"):
+            return cosine_sim_loss(
+                output.f_global, output.p_global, reduction=reduction
+            )
 
     elif cfg.losses.l_global.name == "ctr":
 
-        def loss_fn_global(f_global, f_slots, p_global, p_slots, reduction="mean"):
-            del f_global, f_slots, p_slots
+        def loss_fn_global(output: ModelOutput, *, reduction="mean"):
             return contrastive_loss(
-                p_global, temperature=cfg.losses.l_global.temp, reduction=reduction
+                output.p_global,
+                temperature=cfg.losses.l_global.temp,
+                reduction=reduction,
             )
 
     else:
@@ -321,18 +348,20 @@ def build_losses(cfg):
 
     if cfg.losses.l_objects.name == "ctr_img":
 
-        def loss_fn_objects(f_global, f_slots, p_global, p_slots, reduction="mean"):
-            del f_global, f_slots, p_global
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean"):
             return matching_contrastive_loss_per_img(
-                p_slots, temperature=cfg.losses.l_objects.temp, reduction=reduction
+                output.p_slots,
+                temperature=cfg.losses.l_objects.temp,
+                reduction=reduction,
             )
 
     elif cfg.losses.l_objects.name == "ctr_all":
 
-        def loss_fn_objects(f_global, f_slots, p_global, p_slots, reduction="mean"):
-            del f_global, f_slots, p_global
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean"):
             return matching_contrastive_loss(
-                p_slots, temperature=cfg.losses.l_objects.temp, reduction=reduction
+                output.p_slots,
+                temperature=cfg.losses.l_objects.temp,
+                reduction=reduction,
             )
 
     else:
@@ -342,6 +371,14 @@ def build_losses(cfg):
 
 
 def build_dataset_train(cfg):
+    """Build training dataset.
+
+    Args:
+        cfg: configuration
+
+    Returns:
+        Training dataset.
+    """
     if cfg.data.name == "CLEVR10":
         tfr_path = Path(cfg.data.root) / "clevr_with_masks" / "imgs_train.tfrecords"
         img_size = osc.data.clevr_with_masks.IMAGE_SIZE
@@ -411,7 +448,15 @@ def build_dataset_train(cfg):
     return ds
 
 
-def build_dataset_val(cfg):
+def build_dataset_val(cfg: DictConfig) -> Iterable:
+    """Build validation dataset.
+
+    Args:
+        cfg: configuration
+
+    Returns:
+        Validation dataset.
+    """
     if cfg.data.name == "CLEVR10":
         tfr_path = Path(cfg.data.root) / "clevr_with_masks" / "imgs_val.tfrecords"
         img_size = osc.data.clevr_with_masks.IMAGE_SIZE
@@ -486,7 +531,15 @@ def build_dataset_val(cfg):
     return ds
 
 
-def get_viz_batch(cfg):
+def get_viz_batch(cfg: DictConfig) -> np.ndarray:
+    """Prepare a batch of images for visualization.
+
+    Args:
+        cfg: configuration
+
+    Returns:
+        A batch of images, shape ``[A B C H W]``.
+    """
     if cfg.data.name == "CLEVR10":
         tfr_path = Path(cfg.data.root) / "clevr_with_masks" / "imgs_val.tfrecords"
         img_size = osc.data.clevr_with_masks.IMAGE_SIZE
@@ -545,16 +598,29 @@ def get_viz_batch(cfg):
 
 
 def run_train_val_viz_epochs(
-    cfg,
-    model,
-    optimizer,
-    scheduler,
-    ds_train,
-    ds_val,
-    viz_batch,
-    loss_fn_global,
-    loss_fn_objects,
+    cfg: DictConfig,
+    model: Model,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler._LRScheduler,
+    ds_train: Iterable,
+    ds_val: Iterable,
+    viz_batch: np.ndarray,
+    loss_fn_global: ModelLoss,
+    loss_fn_objects: ModelLoss,
 ):
+    """Run train, val, viz for a certain number of epochs. Handle CTRL+C gracefully.
+
+    Args:
+        cfg:
+        model:
+        optimizer:
+        scheduler:
+        ds_train:
+        ds_val:
+        viz_batch:
+        loss_fn_global:
+        loss_fn_objects:
+    """
     log.info("Start training for %d epochs", cfg.training.num_epochs)
     step_counter = StepCounter()
     with SigIntCatcher() as should_stop:
@@ -595,17 +661,31 @@ def run_train_val_viz_epochs(
     log.info("Done training for %d/%d epochs", epoch + 1, cfg.training.num_epochs)
 
 
+# noinspection PyProtectedMember
 def run_train_epoch(
-    cfg,
-    ds_train,
-    epoch,
-    model,
-    optimizer,
-    scheduler,
-    step_counter,
-    loss_fn_global,
-    loss_fn_objects,
+    cfg: DictConfig,
+    ds_train: Iterable,
+    epoch: int,
+    model: Model,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler._LRScheduler,
+    step_counter: StepCounter,
+    loss_fn_global: ModelLoss,
+    loss_fn_objects: ModelLoss,
 ):
+    """Run one epoch of training.
+
+    Args:
+        cfg:
+        ds_train:
+        epoch:
+        model:
+        optimizer:
+        scheduler:
+        step_counter:
+        loss_fn_global:
+        loss_fn_objects:
+    """
     model.train()
 
     wandb.log({"epoch": epoch}, commit=False, step=int(step_counter))
@@ -628,12 +708,12 @@ def run_train_epoch(
         # f_global, p_global: [AB C]
         # f_slots, p_slots: [AB K C]
         images = torch.from_numpy(np.copy(images)).to(cfg.other.device)
-        f_backbone, f_global, f_slots, p_global, p_slots = model(
+        output: ModelOutput = model(
             einops.rearrange(images, "A B C H W -> (A B) C H W")
         )
 
-        l_global = loss_fn_global(f_global, f_slots, p_global, p_slots)
-        l_objects = loss_fn_objects(f_global, f_slots, p_global, p_slots)
+        l_global = loss_fn_global(output)
+        l_objects = loss_fn_objects(output)
         loss = (
             cfg.losses.l_global.weight * l_global
             + cfg.losses.l_objects.weight * l_objects
@@ -671,13 +751,15 @@ def run_train_epoch(
     epoch_bar.close()
 
 
-def batches_per_epoch_train(cfg):
+def batches_per_epoch_train(cfg: DictConfig) -> int:
+    """Compute number of batches in one training epoch."""
     return batches_per_epoch(
         cfg.data.train.max_samples, cfg.training.batch_size, drop_last=True
     )
 
 
-def batches_per_epoch_val(cfg):
+def batches_per_epoch_val(cfg: DictConfig) -> int:
+    """Compute number of batches in one validation epoch."""
     return batches_per_epoch(
         cfg.data.val.max_samples, cfg.training.batch_size, drop_last=False
     )
@@ -685,13 +767,30 @@ def batches_per_epoch_val(cfg):
 
 @torch.no_grad()
 def run_val_epoch(
-    cfg, ds_val, epoch, model, step_counter, loss_fn_global, loss_fn_objects
+    cfg: DictConfig,
+    ds_val: Iterable,
+    epoch: int,
+    model: Model,
+    step_counter: StepCounter,
+    loss_fn_global: ModelLoss,
+    loss_fn_objects: ModelLoss,
 ):
+    """Run one validation epoch.
+
+    Args:
+        cfg:
+        ds_val:
+        epoch:
+        model:
+        step_counter:
+        loss_fn_global:
+        loss_fn_objects:
+    """
     model.eval()
 
-    l_global = 0
+    l_global_sum = 0
     l_global_div = 0
-    l_objects = 0
+    l_objects_sum = 0
     l_objects_div = 0
 
     last = -1
@@ -711,38 +810,37 @@ def run_val_epoch(
         # f_backbone: [AB H'W' C]
         # f_global, p_global: [AB C]
         # f_slots, p_slots: [AB K C]
+        B = images.shape[1]
         images = torch.from_numpy(np.copy(images)).to(cfg.other.device)
-        f_backbone, f_global, f_slots, p_global, p_slots = model(
+        output: ModelOutput = model(
             einops.rearrange(images, "A B C H W -> (A B) C H W")
         )
 
-        l_global += loss_fn_global(
-            f_global, f_slots, p_global, p_slots, reduction="sum"
-        ).item()
-        l_global_div += p_global.shape[0]
+        l_global = loss_fn_global(output, reduction="none")
+        l_global_sum += l_global.sum().item()
+        l_global_div += l_global.numel()
 
-        l_objects += loss_fn_objects(
-            f_global, f_slots, p_global, p_slots, reduction="sum"
-        ).item()
-        l_objects_div += p_slots.shape[0] * p_slots.shape[1]
+        l_objects = loss_fn_objects(output, reduction="none")
+        l_objects_sum += l_objects.sum().item()
+        l_objects_div += l_objects.numel()
 
         now = time.time()
         if (now - last) > 60:
             epoch_bar.set_postfix(
                 {
-                    "l_global": f"{l_global / l_global_div:.4f}",
-                    "l_objects": f"{l_objects / l_objects_div:.4f}",
+                    "l_global": f"{l_global_sum / l_global_div:.4f}",
+                    "l_objects": f"{l_objects_sum / l_objects_div:.4f}",
                 }
             )
             last = now
-        epoch_bar.update(images.shape[1])
+        epoch_bar.update(B)
 
     epoch_bar.close()
 
     wandb.log(
         {
-            "l_global/val": l_global / l_global_div,
-            "l_objects/val": l_objects / l_objects_div,
+            "l_global/val": l_global_sum / l_global_div,
+            "l_objects/val": l_objects_sum / l_objects_div,
         },
         commit=False,
         step=int(step_counter),
@@ -751,8 +849,26 @@ def run_val_epoch(
 
 @torch.no_grad()
 def run_viz(
-    cfg, viz_batch, epoch, model, step_counter, loss_fn_global, loss_fn_objects
+    cfg: DictConfig,
+    viz_batch: np.ndarray,
+    epoch: int,
+    model: Model,
+    step_counter: StepCounter,
+    loss_fn_global: ModelLoss,
+    loss_fn_objects: ModelLoss,
 ):
+    """Run inference on a single batch of images and visualize everything!
+
+    Args:
+        cfg:
+        viz_batch:
+        epoch:
+        model:
+        step_counter:
+        loss_fn_global:
+        loss_fn_objects:
+    """
+
     # region Prepare input images, save if it's the first epoch
     images = torch.from_numpy(np.copy(viz_batch)).to(cfg.other.device)
     images_np = (
@@ -772,8 +888,8 @@ def run_viz(
     # region Prepare dirs for epoch and image dict for wandb:
     # - epoch0/*.png
     # - epoch0/viz_batch/**/*.png
-    d = Path(f"epoch{epoch}/viz_batch")
-    d.mkdir(exist_ok=True, parents=True)
+    epoch_dir = Path(f"epoch{epoch}/viz_batch")
+    epoch_dir.mkdir(exist_ok=True, parents=True)
     wandb_imgs = {}
     # endregion
 
@@ -798,36 +914,48 @@ def run_viz(
         )
         fig.savefig(f"epoch{epoch}/pos-embed-obj-fn.png", dpi=100)
         plt.close(fig)
-        wandb_imgs["pos_embed/obj_fn"] = fig  # f"epoch{epoch}/pos-embed-obj-fn.png"
+        wandb_imgs["pos-embed/obj_fn"] = fig  # f"epoch{epoch}/pos-embed-obj-fn.png"
     # endregion
 
     # region Forward pass and save attn matrices
     model.eval()
     with vit_slot_forward_with_attns(model) as f:
         (
-            (f_backbone, f_global, f_slots, p_global, p_slots),
+            output,
             vit_attns,
             slot_attns,
         ) = f(einops.rearrange(images, "A B C H W -> (A B) C H W"))
+    torch.save(
+        {
+            "f_backbone": output.f_backbone,
+            "f_global": output.f_global,
+            "f_slots": output.f_slots,
+            "p_global": output.p_global,
+            "p_slots": output.p_slots,
+            "vit_attns": vit_attns,
+            "slot_attns": slot_attns,
+        },
+        epoch_dir / "viz.pth",
+    )
     # endregion
 
     # region Global loss
-    l_global = loss_fn_global(f_global, f_slots, p_global, p_slots).item()
+    l_global = loss_fn_global(output).item()
     fig = viz_contrastive_loss_global_probs(
-        p_global, temp=cfg.losses.l_global.temp, loss=l_global
+        output.p_global, temp=cfg.losses.l_global.temp, loss=l_global
     )
-    fig.savefig(d / "contrastive-global.png", dpi=200)
-    wandb_imgs["viz_batch/l_global"] = fig
+    fig.savefig(epoch_dir / "contrastive-global.png", dpi=200)
+    wandb_imgs["losses/l_global"] = fig
     plt.close(fig)
     # endregion
 
     # region Object loss
-    l_objects = loss_fn_objects(f_global, f_slots, p_global, p_slots).item()
+    l_objects = loss_fn_objects(output).item()
     fig = viz_contrastive_loss_objects_probs(
-        p_slots, temp=cfg.losses.l_objects.temp, loss=l_objects
+        output.p_slots, temp=cfg.losses.l_objects.temp, loss=l_objects
     )
-    fig.savefig(d / "contrastive-objects.png", dpi=200)
-    wandb_imgs["viz_batch/l_objects"] = fig
+    fig.savefig(epoch_dir / "contrastive-objects.png", dpi=200)
+    wandb_imgs["losses/l_objects"] = fig
     plt.close(fig)
     # endregion
 
@@ -886,7 +1014,7 @@ def run_viz(
         cmap = "tab20"
     else:
         raise ValueError(cfg.data.name)
-    vit_kmeans = kmeans_clusters(f_backbone, n_clusters)
+    vit_kmeans = kmeans_clusters(output.f_backbone, n_clusters)
     vit_kmeans = einops.rearrange(
         vit_kmeans, "(A B) (K_h K_w) -> B A K_h K_w", **shapes
     )
@@ -895,20 +1023,23 @@ def run_viz(
 
     # region Save individual images
     for b, a in np.ndindex(B, A):
-        Path(d / f"img{b}/aug{a}").mkdir(exist_ok=True, parents=True)
+        d = epoch_dir / f"img{b}'/f'aug{a}"
+        d.mkdir(exist_ok=True, parents=True)
 
         # Input image
-        img = array_to_pil(images_np[b, a])
-        img.save(d / f"img{b}/aug{a}/input.png")
-        WH = img.size
+        img_input = array_to_pil(images_np[b, a])
+        img_input.save(d / "input.png")
+        WH = img_input.size
 
-        # K-Means of backbone fetures
-        kmeans = array_to_pil(vit_kmeans[b, a])
-        kmeans.save(d / f"img{b}/aug{a}/vit.kmeans.png")
-        kmeans = kmeans.resize(WH, resample=PilImage.NEAREST)
+        # K-Means of backbone features
+        img_kmeans = array_to_pil(vit_kmeans[b, a])
+        img_kmeans.save(d / "vit.kmeans.png")
+        img_kmeans = img_kmeans.resize(WH, resample=PIL.Image.NEAREST)
 
         # ViT backbone, one img per head + avg head
+        imgs_vit: List[List[PIL.Image.Image]] = [[img_input]]
         for lyr, k in enumerate(sorted(vit_attns.keys())):
+            imgs_vit.append([])
             attns = vit_attns[k]
             if cfg.model.backbone.global_pool == "cls":
                 # split and re-normalize attns: [AB head 1+Q 1+K] -> [AB head Q K]
@@ -918,53 +1049,80 @@ def run_viz(
                 pass
             else:
                 raise ValueError(cfg.model.backbone.global_pool)
+
+            # Single heads
             for h in range(attns.shape[1]):
-                array_to_pil(attns[a * B + b, h].mean(axis=0).reshape(K_h, K_w)).save(
-                    d / f"img{b}/aug{a}/vit.block{lyr}.head{h}.png"
+                img_vit_head = array_to_pil(
+                    attns[a * B + b, h].mean(axis=0).reshape(K_h, K_w)
                 )
-            array_to_pil(
-                attns[a * B + b].mean(axis=(0, 1)).reshape(K_h, K_w),
-                cmap="inferno",
-            ).save(d / f"img{b}/aug{a}/vit.block{lyr}.mean.png")
+                img_vit_head.save(d / f"vit.block{lyr}.head{h}.png")
+                img_vit_head = img_vit_head.resize(WH, resample=PIL.Image.NEAREST)
+                imgs_vit[-1].append(img_vit_head)
+
+            # Average heads
+            img_vit_head = array_to_pil(
+                attns[a * B + b].mean(axis=(0, 1)).reshape(K_h, K_w), cmap="inferno"
+            )
+            img_vit_head.save(d / f"vit.block{lyr}.mean.png")
+            img_vit_head = img_vit_head.resize(WH, resample=PIL.Image.NEAREST)
+            imgs_vit[-1].insert(0, img_vit_head)
 
         # ViT rollout
-        vit_r = array_to_pil(vit_rollout[b, a], cmap="inferno")
-        vit_r.save(d / f"img{b}/aug{a}/vit.rollout.png")
-        vit_r = vit_r.resize(WH, resample=PilImage.NEAREST)
+        img_vit_rollout = array_to_pil(vit_rollout[b, a], cmap="inferno")
+        img_vit_rollout.save(d / "vit.rollout.png")
+        img_vit_rollout = img_vit_rollout.resize(WH, resample=PIL.Image.NEAREST)
+        imgs_vit.append([img_vit_rollout])
 
-        # Slot attn backbone, one img per slot per iteration,
-        # one rollout img per slot, one full rollout img per slot
-        slot_r = []
-        slot_r_f = []
+        # Summary of ViT images for wandb
+        imgs_vit: PIL.Image.Image = make_grid_pil(imgs_vit)
+        imgs_vit.save(d / "vit.summary.png")
+        wandb_imgs[f"vit/img{b}/aug{a}"] = imgs_vit
+
+        # Rollout of global representation
+        img_global_rollout = array_to_pil(global_rollout[b, a], cmap="inferno")
+        img_global_rollout.save(d / "global.rollout.png")
+        img_global_rollout = img_global_rollout.resize(WH, resample=PIL.Image.NEAREST)
+
+        # Slot attn backbone, one img per iteration per slot
+        imgs_slot: List[List[PIL.Image.Image]] = [
+            [img_input, img_vit_rollout],
+        ]
+        for i, k in enumerate(sorted(slot_attns.keys())):
+            imgs_slot.append([])
+            for s in range(S):
+                img_slot = array_to_pil(slot_attns[k][a * B + b, s].reshape(K_h, K_w))
+                img_slot.save(d / f"obj.slot{s}.iter{i}.png")
+                img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
+                imgs_slot[-1].append(img_slot)
+        imgs_slot.append([])  # for each slot, rollout of slot attn only
+        imgs_slot.append([])  # for each slot, full rollout to the input
+
+        # Rollout of slot attention
+        imgs_summary: List[List[PIL.Image.Image]] = [
+            [img_input, img_kmeans, img_vit_rollout, img_global_rollout],
+            [],  # for each slot, rollout of slot attn only
+            [],  # for each slot, full rollout to the input
+        ]
         for s in range(S):
-            for i, k in enumerate(sorted(slot_attns.keys())):
-                array_to_pil(slot_attns[k][a * B + b, s].reshape(K_h, K_w)).save(
-                    d / f"img{b}/aug{a}/obj.slot{s}.iter{i}.png"
-                )
+            img_slot_rollout = array_to_pil(slot_rollout[b, a, s], cmap="inferno")
+            img_slot_rollout.save(d / f"obj.slot{s}.rollout.png")
+            img_slot_rollout = img_slot_rollout.resize(WH, resample=PIL.Image.NEAREST)
+            imgs_slot[-2].append(img_slot_rollout)
+            imgs_summary[-2].append(img_slot_rollout)
 
-            x = array_to_pil(slot_rollout[b, a, s], cmap="inferno")
-            x.save(d / f"img{b}/aug{a}/obj.slot{s}.rollout.png")
-            slot_r.append(x.resize(WH, resample=PilImage.NEAREST))
+            img_slot_r_full = array_to_pil(slot_rollout_full[b, a, s], cmap="inferno")
+            img_slot_r_full.save(d / f"obj.slot{s}.rollout_full.png")
+            img_slot_r_full = img_slot_r_full.resize(WH, resample=PIL.Image.NEAREST)
+            imgs_slot[-1].append(img_slot_r_full)
+            imgs_summary[-1].append(img_slot_r_full)
 
-            x = array_to_pil(slot_rollout_full[b, a, s], cmap="inferno")
-            x.save(d / f"img{b}/aug{a}/obj.slot{s}.rollout_full.png")
-            slot_r_f.append(x.resize(WH, resample=PilImage.NEAREST))
+        imgs_slot: PIL.Image.Image = make_grid_pil(imgs_slot)
+        imgs_slot.save(d / "obj.slots.png")
+        wandb_imgs[f"obj/img{b}/aug{a}"] = imgs_slot
 
-        # Global rollout
-        global_r = array_to_pil(global_rollout[b, a], cmap="inferno")
-        global_r.save(d / f"img{b}/aug{a}/global.rollout.png")
-        global_r = global_r.resize(WH, resample=PilImage.NEAREST)
-
-        # Summary image for wandb
-        grid = make_grid_pil(
-            [
-                [img, kmeans, vit_r, global_r],
-                slot_r,
-                slot_r_f,
-            ]
-        )
-        grid.save(d / f"img{b}/aug{a}/summary.png")
-        wandb_imgs[f"img{b}/aug{a}"] = grid
+        imgs_summary: PIL.Image.Image = make_grid_pil(imgs_summary)
+        imgs_summary.save(d / "summary.png")
+        wandb_imgs[f"summary/img{b}/aug{a}"] = imgs_summary
     # endregion
 
     wandb.log(
@@ -972,17 +1130,3 @@ def run_viz(
         step=int(step_counter),
         commit=False,
     )
-
-
-class StepCounter(object):
-    def __init__(self):
-        self.steps = 0
-
-    def __int__(self):
-        return self.steps
-
-    def step(self):
-        self.steps += 1
-
-    def __str__(self):
-        return f"{self.__class__.__name__}({int(self)})"

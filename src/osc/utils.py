@@ -137,6 +137,7 @@ def batches_per_epoch(num_samples: int, batch_size: int, drop_last: bool) -> int
 
 
 def seed_everything(seed: int):
+    """Seed python, torch, tensorflow, and numpy"""
     random.seed(seed)
     torch.manual_seed(seed)
     tf.random.set_seed(seed)
@@ -160,6 +161,7 @@ def latest_checkpoint(run_dir: Union[Path, str]) -> Path:
 
 @torch.jit.script
 def normalize_sum_to_one(tensor: torch.Tensor, dim: int = -1) -> torch.Tensor:
+    """Normalize tensor so that it sums to one over the last dimension."""
     return tensor / tensor.sum(dim=dim, keepdim=True).clamp_min(1e-8)
 
 
@@ -206,3 +208,19 @@ class SigIntCatcher(AbstractContextManager):
         else:
             log.warning("Interrupted again, raising exception")
             raise KeyboardInterrupt()
+
+
+class StepCounter(object):
+    """A simple counter to keep track of update steps."""
+
+    def __init__(self):
+        self.steps = 0
+
+    def __int__(self):
+        return self.steps
+
+    def step(self):
+        self.steps += 1
+
+    def __str__(self):
+        return f"{self.__class__.__name__}({int(self)})"

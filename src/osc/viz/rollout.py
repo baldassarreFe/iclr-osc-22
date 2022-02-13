@@ -1,7 +1,6 @@
 from typing import Callable, Mapping, Sequence, Union
 
 import einops
-import einops.layers.torch
 import torch
 
 from osc.utils import normalize_sum_to_one
