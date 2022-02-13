@@ -1,3 +1,8 @@
+# Don't use this config directly, include one of the two architectures
+# from the command line, e.g. +model=vit_global_obj
+
+architecture: null
+
 backbone:
   patch_size: [8, 8]
   # Embedding dimension C

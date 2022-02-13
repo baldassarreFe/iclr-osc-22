@@ -1,5 +1,10 @@
 defaults:
-  - _self_
   - vit_common
+  - _self_
 
 architecture: 'backbone-obj_fn(-global_fn-global_proj)-obj_proj'
+
+backbone:
+  # Global features are avg-pooled from object features,
+  # so it doesn't make sense to have an extra CLS token
+  global_pool: 'avg'
