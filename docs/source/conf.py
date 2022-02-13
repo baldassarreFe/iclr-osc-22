@@ -34,6 +34,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.githubpages",
@@ -49,8 +50,23 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
-# My options
+# -- My options --------------------------------------------------------------
+
+# Enable autosummary
 autosummary_generate = True
+
+# Make sure __init__ is added to the docs for classes
+autoclass_content = "both"
+
+# Keep naming short in the pages. Headings contain full names instead.
+add_module_names = False
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "torch": ("https://pytorch.org/docs/stable/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "PIL": ("https://pillow.readthedocs.io/en/stable/", None),
+}
 
 # -- Options for HTML output -------------------------------------------------
 

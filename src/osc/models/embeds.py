@@ -1,3 +1,7 @@
+"""
+Positional embeddings and query tokens for objects.
+"""
+
 import numpy as np
 import timm.models
 import torch

@@ -1,3 +1,7 @@
+"""
+Main training methods.
+"""
+
 import logging
 import random
 import time
@@ -125,10 +129,10 @@ def update_cfg(cfg: DictConfig, readonly=True):
                 raise ValueError(cfg.data.name)
 
         if cfg.other.seed is None:
-            OmegaConf.update(up, "other.seed", random.randint(0, 2 ** 32))
+            OmegaConf.update(up, "other.seed", random.randint(0, np.power(2, 32)))
 
         if cfg.data.train.seed is None:
-            OmegaConf.update(up, "data.train.seed", random.randint(0, 2 ** 32))
+            OmegaConf.update(up, "data.train.seed", random.randint(0, np.power(2, 32)))
 
         if cfg.logging.id is None:
             OmegaConf.update(up, "logging.id", wandb.util.generate_id())

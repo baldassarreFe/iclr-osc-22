@@ -1,3 +1,14 @@
+"""
+Self, cross, co, and slot attentions.
+
+Attention modules implement the query-key-value projections,
+the attention itself, and the output projections.
+
+Block modules wrap an attention module with layer norm,
+feed-forward layers and residual connections.
+"""
+from typing import Tuple
+
 import numpy as np
 import opt_einsum
 import torch
@@ -7,7 +18,28 @@ from torch import nn
 
 
 class SelfAttention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0.0, proj_drop=0.0):
+    """Self attention.
+
+    Check the :func:`forward` method.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int = 8,
+        qkv_bias: bool = False,
+        attn_drop: float = 0.0,
+        proj_drop: float = 0.0,
+    ):
+        """Init.
+
+        Args:
+            dim:
+            num_heads:
+            qkv_bias:
+            attn_drop:
+            proj_drop:
+        """
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
@@ -34,9 +66,16 @@ class SelfAttention(nn.Module):
             nn.Dropout(proj_drop),
         )
 
-    def forward(self, x):
-        # x: [B L C]
-        # K = Q = L
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward.
+
+        Args:
+            x: tensor of shape ``[B L C]``
+
+        Returns:
+            Tensor of shape ``[B L C]``.
+        """
+        # Keys K=L, queries K=L
 
         # [B K HC] -> [3 B K H C] -> ([B K H C], [B K H C], [B K H C])
         q, k, v = self.proj_qkv(x).unbind(dim=0)
@@ -55,7 +94,32 @@ class SelfAttention(nn.Module):
 
 
 class CrossAttention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0.0, proj_drop=0.0):
+    """Cross attention.
+
+    Diagram::
+
+        TODO
+
+    Check the :func:`forward` method.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int = 8,
+        qkv_bias: bool = False,
+        attn_drop: float = 0.0,
+        proj_drop: float = 0.0,
+    ):
+        """Init.
+
+        Args:
+            dim:
+            num_heads:
+            qkv_bias:
+            attn_drop:
+            proj_drop:
+        """
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
@@ -85,7 +149,16 @@ class CrossAttention(nn.Module):
             nn.Dropout(proj_drop),
         )
 
-    def forward(self, x, ctx):
+    def forward(self, x: torch.Tensor, ctx: torch.Tensor) -> torch.Tensor:
+        """Forward.
+
+        Args:
+            x: query tensor of shape ``[B Q C]``
+            ctx: key-value tensor of shape ``[B K C]``
+
+        Returns:
+            Tensor of shape ``[B Q C]``.
+        """
         # x:   [B Q C] queries
         # ctx: [B K C] context (key-value)
 
@@ -109,14 +182,32 @@ class CrossAttention(nn.Module):
 
 
 class SlotAttention(nn.Module):
+    """Slot attention.
+
+    Diagram::
+
+        TODO
+
+    Check the :func:`forward` method.
+    """
+
     def __init__(
         self,
-        dim,
+        dim: int,
         pos_embed=None,
-        iters=3,
-        eps=1e-8,
-        hidden_dim=None,
+        iters: int = 3,
+        eps: float = 1e-8,
+        hidden_dim: int = None,
     ):
+        """Init.
+
+        Args:
+            dim:
+            pos_embed:
+            iters:
+            eps:
+            hidden_dim:
+        """
         super().__init__()
         self.num_iters = iters
         self.eps = eps
@@ -147,7 +238,17 @@ class SlotAttention(nn.Module):
         self.norm_slots = nn.LayerNorm(dim)
         self.norm_pre_ff = nn.LayerNorm(dim)
 
-    def forward(self, slots: torch.Tensor, inputs: torch.Tensor):
+    def forward(self, slots: torch.Tensor, inputs: torch.Tensor) -> torch.Tensor:
+        """Forward.
+
+        Args:
+            slots: query tensor of shape ``[B S C]``
+            inputs: key-value tensor of shape ``[B N C]``
+
+        Returns:
+            Tensor of shape ``[B S C]``.
+        """
+
         B, S, C = slots.shape
         B, N, C = inputs.shape
 
@@ -178,25 +279,31 @@ class SlotAttention(nn.Module):
 
 
 class SelfAttentionBlock(nn.Module):
-    """Self attention block
+    """Self attention block.
 
     Diagram::
 
          ┌───┤
          │   ▼
          │ norm
+         │   │
          │   ▼
          │ attn
+         │   │
          │   ▼
          └──►+
          ┌───┤
          │   ▼
          │ norm
+         │   │
          │   ▼
          │  MLP
+         │   │
          │   ▼
          └──►+
              ▼
+
+    Check the :func:`forward` method.
     """
 
     # Reference implementation: timm.models.vision_transformer.Block
@@ -204,14 +311,27 @@ class SelfAttentionBlock(nn.Module):
         self,
         dim: int,
         num_heads: int,
-        mlp_ratio=4.0,
-        qkv_bias=False,
-        drop=0.0,
-        attn_drop=0.0,
-        drop_path=0.0,
-        act_layer=nn.GELU,
-        norm_layer=nn.LayerNorm,
+        mlp_ratio: float = 4.0,
+        qkv_bias: bool = False,
+        drop: float = 0.0,
+        attn_drop: float = 0.0,
+        drop_path: float = 0.0,
+        act_layer: nn.Module = nn.GELU,
+        norm_layer: nn.Module = nn.LayerNorm,
     ):
+        """Init.
+
+        Args:
+            dim:
+            num_heads:
+            mlp_ratio:
+            qkv_bias:
+            drop:
+            attn_drop:
+            drop_path:
+            act_layer:
+            norm_layer:
+        """
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.attn = SelfAttention(
@@ -230,14 +350,27 @@ class SelfAttentionBlock(nn.Module):
             drop=drop,
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward.
+
+        Args:
+            x: query tensor of shape ``[B L C]``
+
+        Returns:
+            Tensor of shape ``[B L C]``.
+        """
+
         x = x + self.drop_path(self.attn(self.norm1(x)))
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
 
 class CrossAttentionBlock(nn.Module):
-    # Reference implementation: timm.models.vision_transformer.Block
+    """Cross attention block.
+
+    Check the :func:`forward` method.
+    """
+
     def __init__(
         self,
         dim: int,
@@ -250,6 +383,19 @@ class CrossAttentionBlock(nn.Module):
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
     ):
+        """Init.
+
+        Args:
+            dim:
+            num_heads:
+            mlp_ratio:
+            qkv_bias:
+            drop:
+            attn_drop:
+            drop_path:
+            act_layer:
+            norm_layer:
+        """
         super().__init__()
         self.norm1_x = norm_layer(dim)
         self.norm1_ctx = norm_layer(dim)
@@ -269,15 +415,30 @@ class CrossAttentionBlock(nn.Module):
             drop=drop,
         )
 
-    def forward(self, x, ctx):
+    def forward(self, x: torch.Tensor, ctx: torch.Tensor) -> torch.Tensor:
+        """Forward.
+
+        Args:
+            x: query tensor of shape ``[B Q C]``
+            ctx: key-value tensor of shape ``[B K C]``
+
+        Returns:
+            Tensor of shape ``[B Q C]``.
+        """
+
         x = x + self.drop_path(self.attn(self.norm1_x(x), self.norm1_ctx(ctx)))
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
 
 class CoAttentionBlock(nn.Module):
+    """Co-attention block, both a->b and b->a.
+
+    Check the :func:`forward` method.
+    """
+
     def __init__(self, *args, **kwargs):
-        """
+        """Init.
 
         Args:
             *args: Same as :class:`CrossAttentionBlock`
@@ -287,7 +448,21 @@ class CoAttentionBlock(nn.Module):
         self.cross_a_b = CrossAttentionBlock(*args, **kwargs)
         self.cross_b_a = CrossAttentionBlock(*args, **kwargs)
 
-    def forward(self, a, b):
+    def forward(
+        self, a: torch.Tensor, b: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward.
+
+        Args:
+            a: tensor of shape ``[B N C]``
+            b: tensor of shape ``[B M C]``
+
+        Returns:
+            Tensors with shapes:
+            ``[B N C]`` (``a`` attending to ``b``),
+            ``[B M C]`` (``b`` attending to ``a``).
+        """
+
         new_a = self.cross_a_b(a, b)
         new_b = self.cross_b_a(b, a)
         return new_a, new_b

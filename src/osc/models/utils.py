@@ -1,3 +1,7 @@
+"""
+Misc modules.
+"""
+
 from typing import Tuple
 
 import einops.layers.torch

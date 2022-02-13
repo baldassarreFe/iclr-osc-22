@@ -1,3 +1,7 @@
+"""
+Model definitions and wrappers to get attention maps.
+"""
+
 from contextlib import contextmanager
 from typing import Dict, List, NamedTuple
 

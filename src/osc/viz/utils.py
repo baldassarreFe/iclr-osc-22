@@ -86,6 +86,19 @@ def subplots_grid(
     dpi: int = 200,
     **kwargs,
 ) -> Tuple[Figure, NDArray[Axis]]:
+    """Create a grid of subplots with identical aspect ratio.
+
+    Args:
+        nrows:
+        ncols:
+        ax_aspect_hw:
+        ax_height_inch:
+        dpi:
+        **kwargs:
+
+    Returns:
+        A figure and an array of axes (possibly squeezed).
+    """
     figsize_wh = (
         ax_height_inch * ncols * ax_aspect_hw[1] / ax_aspect_hw[0],
         ax_height_inch * nrows,

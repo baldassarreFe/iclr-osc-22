@@ -172,12 +172,12 @@ class SigIntCatcher(AbstractContextManager):
         Gracefully terminate a loop:
 
         >>> with SigIntCatcher() as should_stop:
-        >>> for i in range(1000):
-        >>>     print(f"Step {i}...")
-        >>>     time.sleep(5)
-        >>>     print("Done")
-        >>>     if should_stop:
-        >>>         break
+        >>>     for i in range(1000):
+        >>>         print(f"Step {i}...")
+        >>>         time.sleep(5)
+        >>>         print("Done")
+        >>>         if should_stop:
+        >>>             break
     """
 
     def __init__(self):
@@ -220,6 +220,7 @@ class StepCounter(object):
         return self.steps
 
     def step(self):
+        """Increment by 1."""
         self.steps += 1
 
     def __str__(self):
