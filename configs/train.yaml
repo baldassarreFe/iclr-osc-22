@@ -13,8 +13,9 @@ defaults:
 training:
   batch_size: 64
   num_epochs: null # defaults to warmup + decay
+  checkpoint_interval: 5
 
 other:
-  debug: no
+  debug: false
   seed: null # defaults to random
   device: 'cuda:0'

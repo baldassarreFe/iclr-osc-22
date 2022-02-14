@@ -95,8 +95,10 @@ def update_cfg(cfg: DictConfig, readonly=True):
 
     if cfg.other.debug:
         OmegaConf.update(up, "training.num_epochs", 3)
+        OmegaConf.update(up, "training.checkpoint_interval", 1)
         OmegaConf.update(up, "data.train.max_samples", 10 * cfg.training.batch_size)
         OmegaConf.update(up, "data.val.max_samples", 10 * cfg.training.batch_size)
+        OmegaConf.update(up, "data.viz.epoch_interval", 1)
         OmegaConf.update(up, "other.seed", 42)
         OmegaConf.update(up, "data.train.seed", 42)
 
@@ -643,23 +645,36 @@ def run_train_val_viz_epochs(
             run_val_epoch(
                 cfg, ds_val, epoch, model, step_counter, loss_fn_global, loss_fn_objects
             )
-            run_viz(
-                cfg,
-                viz_batch,
-                epoch,
-                model,
-                step_counter,
-                loss_fn_global,
-                loss_fn_objects,
-            )
-            torch.save(
-                {
-                    "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "steps": int(step_counter),
-                },
-                f"./checkpoint.{epoch}.pth",
-            )
+
+            if (
+                epoch % cfg.data.viz.epoch_interval == 0
+                or (epoch == cfg.training.num_epochs - 1)
+                or should_stop
+            ):
+                run_viz(
+                    cfg,
+                    viz_batch,
+                    epoch,
+                    model,
+                    step_counter,
+                    loss_fn_global,
+                    loss_fn_objects,
+                )
+
+            if (
+                epoch % cfg.training.checkpoint_interval == 0
+                or (epoch == cfg.training.num_epochs - 1)
+                or should_stop
+            ):
+                torch.save(
+                    {
+                        "model": model.state_dict(),
+                        "optimizer": optimizer.state_dict(),
+                        "steps": int(step_counter),
+                    },
+                    f"./checkpoint.{epoch}.pth",
+                )
+
             if should_stop:
                 break
     log.info("Done training for %d/%d epochs", epoch + 1, cfg.training.num_epochs)
@@ -1027,7 +1042,7 @@ def run_viz(
 
     # region Save individual images
     for b, a in np.ndindex(B, A):
-        d = epoch_dir / f"img{b}'/f'aug{a}"
+        d = epoch_dir / f"img{b}" / f"aug{a}"
         d.mkdir(exist_ok=True, parents=True)
 
         # Input image

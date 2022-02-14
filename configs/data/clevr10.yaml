@@ -17,3 +17,4 @@ val:
 viz:
   seed: 6676759028237078
   max_samples: 4
+  epoch_interval: 5

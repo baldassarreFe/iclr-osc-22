@@ -10,7 +10,7 @@ backbone:
   # Positional embedding
   pos_embed: "learned"
   pos_embed_dropout: 0.0
-  pos_embed_every_layer: yes
+  pos_embed_every_layer: true
   # Number of layers L
   num_layers: 4  # L
   # Number of heads h
@@ -32,7 +32,7 @@ global_proj:
   hidden_mult: 2.0
   activation: 'gelu'
   dropout: 0.0
-  out_bias: no
+  out_bias: false
 
 obj_queries:
   name: "sample"
@@ -48,4 +48,4 @@ obj_proj:
   hidden_mult: 2.0
   activation: 'gelu'
   dropout: 0.0
-  out_bias: no
+  out_bias: false
