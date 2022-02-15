@@ -1,3 +1,16 @@
+"""
+Helper functions to bridge tensorflow image data to pytorch.
+
+Functions:
+
+- Image normalization back and forth
+- Augmentation
+
+    - Augmentations with ''stateless'' random seeds
+    - Fixed augmentations
+    - Double augmentation for contrastive training
+"""
+
 from typing import Callable, Protocol, Tuple
 
 import tensorflow as tf

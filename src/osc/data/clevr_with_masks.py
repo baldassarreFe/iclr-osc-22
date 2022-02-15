@@ -1,3 +1,11 @@
+"""
+CLEVR with masks dataset: preprocessing and loading.
+"""
+
+import argparse
+import sys
+from functools import partial
+from itertools import islice
 from pathlib import Path
 from typing import Union
 
@@ -7,11 +15,98 @@ import multi_object_datasets.clevr_with_masks
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import tqdm
+
+from osc.data.tfrecords import deserialize_image, serialize_image
 
 IMAGE_SIZE = multi_object_datasets.clevr_with_masks.IMAGE_SIZE
+MAX_NUM_ENTITIES = multi_object_datasets.clevr_with_masks.MAX_NUM_ENTITIES
 NUM_SAMPLES_TOTAL = 100_000
 NUM_SAMPLES_TRAIN = 70_000
 NUM_SAMPLES_VAL = 15_000
+NUM_SAMPLES_TEST = 15_000
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Preprocess and split CLEVR with masks dataset into 3 splits: "
+        "train+val only contain RGB images, "
+        "test contains the full sample dictionary."
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        required=True,
+        help="Filesystem path 'path/to/multi-object-datasets'",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing processed files 'imgs_{train,val,test}.tfrecords'",
+    )
+    args = parser.parse_args()
+    data_root = args.data_root / "clevr_with_masks"
+    dst_paths = {
+        split: Path.as_posix(data_root / f"imgs_{split}.tfrecords")
+        for split in ["train", "val", "test"]
+    }
+
+    if not args.overwrite:
+        for p in dst_paths.values():
+            if p.is_file():
+                print(
+                    f"Error, output file already exists, use --overwrite: {p}",
+                    file=sys.stderr,
+                )
+                exit(-1)
+
+    def process(idx, example):
+        if idx >= NUM_SAMPLES_TRAIN + NUM_SAMPLES_VAL:
+            return example
+        example = multi_object_datasets.clevr_with_masks._decode(example)
+        example = tf.py_function(serialize_image, (example["image"],), tf.string)
+        return example
+
+    ds = (
+        tf.data.TFRecordDataset(
+            Path.as_posix(data_root / "clevr_with_masks_train.tfrecords"),
+            compression_type="GZIP",
+        )
+        .enumerate()
+        .map(
+            process,
+            num_parallel_calls=tf.data.AUTOTUNE,
+            deterministic=True,
+        )
+        .as_numpy_iterator()
+    )
+
+    for split, num_samples in [
+        ("train", NUM_SAMPLES_TRAIN),
+        ("val", NUM_SAMPLES_VAL),
+        ("test", NUM_SAMPLES_TEST),
+    ]:
+        # Write all samples
+        with tf.io.TFRecordWriter(dst_paths[split], options="GZIP") as writer:
+            for example in tqdm.tqdm(
+                islice(ds, num_samples),
+                desc=f"Writing {split}",
+                unit=" imgs",
+                total=num_samples,
+            ):
+                writer.write(example)
+
+        # Check reading
+        ds_check = tf.data.TFRecordDataset(
+            dst_paths[split], compression_type="GZIP"
+        ).take(100)
+        if split in {"train", "val"}:
+            ds_check = ds_check.map(partial(deserialize_image, img_size=IMAGE_SIZE))
+        else:
+            ds_check = ds_check.map(multi_object_datasets.clevr_with_masks._decode)
+            ds_check = ds_check.map(fix_tf_dtypes)
+        for _ in tqdm.tqdm(ds_check, desc=f"Reading {split}", unit=" imgs", total=100):
+            pass
 
 
 def show_sample(sample):
@@ -82,3 +177,7 @@ def get_iterator(
     if numpy:
         ds = ds.as_numpy_iterator()
     return ds
+
+
+if __name__ == "__main__":
+    main()

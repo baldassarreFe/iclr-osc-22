@@ -62,3 +62,8 @@ Data loading and visualization notebooks:
 - [ObjectsRoom](notebooks/datasets/ObjectsRoom.ipynb)
 - [Tetrominoes](notebooks/datasets/Tetrominoes.ipynb)
 - [ClevrWithMasks](notebooks/datasets/ClevrWithMasks.ipynb)
+
+Prepare datasets:
+```bash
+python -m osc.data.clevr_with_masks --data-root "${HOME}/multi-object-datasets"
+```
