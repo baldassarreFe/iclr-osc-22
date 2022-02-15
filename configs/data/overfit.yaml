@@ -1,7 +1,0 @@
-# Overfit on a smaller dataset
-# Enable with: train.py ... +data=overfit
-
-train:
-  max_samples: 6400
-val:
-  max_samples: 6400

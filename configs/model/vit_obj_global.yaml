@@ -1,5 +1,5 @@
 defaults:
-  - vit_common
+  - common
   - _self_
 
 architecture: 'backbone-obj_fn(-global_fn-global_proj)-obj_proj'

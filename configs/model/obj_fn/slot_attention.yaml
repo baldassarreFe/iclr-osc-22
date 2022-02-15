@@ -1,0 +1,4 @@
+name: 'slot-attention'
+hidden_mult: 2.0
+pos_embed: null
+num_iters: 3

@@ -1,0 +1,5 @@
+name: 'cross-attention'
+hidden_mult: 2.0
+pos_embed: null
+num_layers: 2
+num_heads: 4

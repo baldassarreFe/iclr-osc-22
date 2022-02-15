@@ -1,5 +1,6 @@
 # Don't use this config directly, include one of the two architectures
-# from the command line, e.g. +model=vit_global_obj
+# from the command line, e.g. model=vit_global_obj, and select the
+# obj_fn as model/obj_fn=slot_attention
 
 architecture: null
 
@@ -38,11 +39,8 @@ obj_queries:
   name: "sample"
   num_objects: 11 # S
 
-obj_fn:
-  name: 'slot-attention'
-  hidden_mult: 2.0
-  pos_embed: null
-  num_iters: 3
+# Specified in its own config group
+obj_fn: null
 
 obj_proj:
   hidden_mult: 2.0

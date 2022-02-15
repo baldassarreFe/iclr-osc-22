@@ -1,0 +1,12 @@
+# @package _global_
+
+# Usage: ./train.py +overfit=overfit
+
+data:
+  train:
+    max_samples: 6400
+  val:
+    max_samples: 6400
+
+logging:
+  tags: ['overfit']

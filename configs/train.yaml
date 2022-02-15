@@ -1,11 +1,12 @@
 defaults:
-  - model/vit_global_obj
-  - data/clevr10
-  - losses/l_global/ctr
-  - losses/l_objects/ctr_img
-  - optimizer/adam
-  - lr_scheduler/linear1_cosine4_x10
-  - logging/wandb
+  - model: common
+  - model/obj_fn: slot_attention
+  - data: clevr10
+  - losses/l_global: ctr
+  - losses/l_objects: ctr_img
+  - optimizer: adam
+  - lr_scheduler: linear1_cosine4_x10
+  - logging: wandb
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
   - _self_
