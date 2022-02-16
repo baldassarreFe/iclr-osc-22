@@ -18,3 +18,7 @@ viz:
   seed: 6676759028237078
   max_samples: 4
   epoch_interval: 5
+
+test:
+  max_samples: null # defaults to all
+  epoch_interval: 5

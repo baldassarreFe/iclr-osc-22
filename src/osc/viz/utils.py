@@ -123,8 +123,21 @@ def fig_save_display(fig: Figure, path: Union[str, Path], dpi=100, width=400):
     display(Image(url=path, width=width))
 
 
-def batched_otsu(x: np.ndarray):
-    result = np.empty_like(x)
+def batched_otsu(x: np.ndarray) -> np.ndarray:
+    """Batched Otsu thresholding.
+
+    Args:
+        x: numpy array of shape ``[..., H, W]`` with leading batch dimensions
+
+    Returns:
+        Numpy array of thresholded images, same shape as the input.
+    """
+    result = np.empty(x.shape, dtype=bool)
     for b in np.ndindex(x.shape[:-2]):
         result[b] = x[b] > skimage.filters.threshold_otsu(x[b])
     return result
+
+
+def batched_otsu_pt(x: torch.Tensor) -> torch.Tensor:
+    """Same as :func:``batched_otsu`` but with torch tensors."""
+    return torch.from_numpy(batched_otsu(x.cpu().numpy())).to(x.device)

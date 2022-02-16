@@ -36,7 +36,7 @@ global_proj:
   out_bias: false
 
 obj_queries:
-  name: "sample"
+  name: "learned"
   num_objects: 11 # S
 
 # Specified in its own config group

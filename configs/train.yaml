@@ -1,5 +1,5 @@
 defaults:
-  - model: common
+  - model: vit_obj_global
   - model/obj_fn: slot_attention
   - data: clevr10
   - losses/l_global: ctr

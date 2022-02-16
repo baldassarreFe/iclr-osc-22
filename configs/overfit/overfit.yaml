@@ -7,6 +7,8 @@ data:
     max_samples: 6400
   val:
     max_samples: 6400
+  test:
+    max_samples: 6400
 
 logging:
   tags: ['overfit']

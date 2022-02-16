@@ -12,6 +12,7 @@ from typing import Iterable, List, Optional, Protocol, Tuple
 
 import einops
 import hydra
+import multi_object_datasets.clevr_with_masks
 import namesgenerator
 import numpy as np
 import omegaconf
@@ -19,6 +20,7 @@ import PIL.Image
 import tabulate
 import tensorflow as tf
 import torch
+import torch.nn.functional
 import tqdm
 import wandb
 import wandb.util
@@ -50,7 +52,8 @@ from osc.viz.embeds import viz_positional_embedding
 from osc.viz.loss_global import viz_contrastive_loss_global_probs
 from osc.viz.loss_objects import viz_contrastive_loss_objects_probs
 from osc.viz.rollout import self_attn_rollout, slot_attn_rollout
-from osc.viz.utils import array_to_pil, make_grid_pil
+from osc.viz.segmentation import match_segmentation_masks
+from osc.viz.utils import array_to_pil, batched_otsu_pt, make_grid_pil
 from osc.wandb_utils import setup_wandb
 
 log = logging.getLogger(__name__)
@@ -67,6 +70,7 @@ def main(cfg: DictConfig) -> None:
 
     ds_train = build_dataset_train(cfg)
     ds_val = build_dataset_val(cfg)
+    ds_test = build_dataset_test(cfg)
     viz_batch = get_viz_batch(cfg)
 
     model = build_model(cfg).to(cfg.other.device)
@@ -82,6 +86,7 @@ def main(cfg: DictConfig) -> None:
         scheduler,
         ds_train,
         ds_val,
+        ds_test,
         viz_batch,
         loss_fn_global,
         loss_fn_objects,
@@ -98,7 +103,9 @@ def update_cfg(cfg: DictConfig, readonly=True):
         OmegaConf.update(up, "training.checkpoint_interval", 1)
         OmegaConf.update(up, "data.train.max_samples", 10 * cfg.training.batch_size)
         OmegaConf.update(up, "data.val.max_samples", 10 * cfg.training.batch_size)
+        OmegaConf.update(up, "data.test.max_samples", 10 * cfg.training.batch_size)
         OmegaConf.update(up, "data.viz.epoch_interval", 1)
+        OmegaConf.update(up, "data.test.epoch_interval", 1)
         OmegaConf.update(up, "other.seed", 42)
         OmegaConf.update(up, "data.train.seed", 42)
 
@@ -126,6 +133,16 @@ def update_cfg(cfg: DictConfig, readonly=True):
                     up,
                     "data.val.max_samples",
                     osc.data.clevr_with_masks.NUM_SAMPLES_VAL,
+                )
+            else:
+                raise ValueError(cfg.data.name)
+
+        if cfg.data.test.max_samples is None:
+            if cfg.data.name == "CLEVR10":
+                OmegaConf.update(
+                    up,
+                    "data.test.max_samples",
+                    osc.data.clevr_with_masks.NUM_SAMPLES_TEST,
                 )
             else:
                 raise ValueError(cfg.data.name)
@@ -308,6 +325,15 @@ def build_optimizer(cfg: DictConfig, model: torch.nn.Module) -> torch.optim.Opti
 
 
 def build_scheduler(cfg, optimizer):
+    """Build learning rate scheduler for training.
+
+    Args:
+        cfg: configuration
+        optimizer: optimizer
+
+    Returns:
+        A learning rate scheduler.
+    """
     if cfg.lr_scheduler.decay.name == "cosine":
         bpe = batches_per_epoch_train(cfg)
         return LinearWarmupCosineAnneal(
@@ -537,6 +563,64 @@ def build_dataset_val(cfg: DictConfig) -> Iterable:
     return ds
 
 
+def build_dataset_test(cfg: DictConfig) -> tf.data.Dataset:
+    """Build test dataset.
+
+    Args:
+        cfg: configuration
+
+    Returns:
+        Test dataset.
+    """
+    if cfg.data.name == "CLEVR10":
+        tfr_path = Path(cfg.data.root) / "clevr_with_masks" / "imgs_test.tfrecords"
+        img_size = osc.data.clevr_with_masks.IMAGE_SIZE
+        if cfg.data.test.max_samples > osc.data.clevr_with_masks.NUM_SAMPLES_TEST:
+            raise ValueError(cfg.data.test.max_samples)
+
+        ds = (
+            tf.data.TFRecordDataset(
+                tfr_path.expanduser().resolve().as_posix(), compression_type="GZIP"
+            )
+            .take(cfg.data.test.max_samples)
+            .map(
+                multi_object_datasets.clevr_with_masks._decode,
+                num_parallel_calls=tf.data.AUTOTUNE,
+                deterministic=True,
+            )
+            .map(
+                osc.data.clevr_with_masks.fix_tf_dtypes,
+                num_parallel_calls=tf.data.AUTOTUNE,
+                deterministic=True,
+            )
+            .map(
+                partial(
+                    osc.data.clevr_with_masks.prepare_test_segmentation,
+                    img_size=tuple(img_size),
+                    crop_size=tuple(cfg.data.crop_size),
+                    mean=tuple(cfg.data.normalize.mean),
+                    std=tuple(cfg.data.normalize.std),
+                ),
+                num_parallel_calls=tf.data.AUTOTUNE,
+                deterministic=True,
+            )
+        )
+    else:
+        raise ValueError(cfg.data.name)
+
+    # Other stuff
+    ds = ds.batch(cfg.training.batch_size, drop_remainder=False)
+    ds = ds.prefetch(tf.data.AUTOTUNE)
+
+    log.info(
+        "Dataset test, %d samples, %d batch size, %d batches",
+        cfg.data.test.max_samples,
+        cfg.training.batch_size,
+        batches_per_epoch_test(cfg),
+    )
+    return ds
+
+
 def get_viz_batch(cfg: DictConfig) -> np.ndarray:
     """Prepare a batch of images for visualization.
 
@@ -610,6 +694,7 @@ def run_train_val_viz_epochs(
     scheduler: torch.optim.lr_scheduler._LRScheduler,
     ds_train: Iterable,
     ds_val: Iterable,
+    ds_test: tf.data.Dataset,
     viz_batch: np.ndarray,
     loss_fn_global: ModelLoss,
     loss_fn_objects: ModelLoss,
@@ -631,6 +716,8 @@ def run_train_val_viz_epochs(
     step_counter = StepCounter()
     with SigIntCatcher() as should_stop:
         for epoch in range(cfg.training.num_epochs):
+            is_last = epoch == cfg.training.num_epochs - 1
+
             run_train_epoch(
                 cfg,
                 ds_train,
@@ -646,11 +733,10 @@ def run_train_val_viz_epochs(
                 cfg, ds_val, epoch, model, step_counter, loss_fn_global, loss_fn_objects
             )
 
-            if (
-                epoch % cfg.data.viz.epoch_interval == 0
-                or (epoch == cfg.training.num_epochs - 1)
-                or should_stop
-            ):
+            if epoch % cfg.data.test.epoch_interval == 0 or is_last or should_stop:
+                run_test_segmentation(cfg, ds_test, epoch, model, step_counter)
+
+            if epoch % cfg.data.viz.epoch_interval == 0 or is_last or should_stop:
                 run_viz(
                     cfg,
                     viz_batch,
@@ -661,11 +747,7 @@ def run_train_val_viz_epochs(
                     loss_fn_objects,
                 )
 
-            if (
-                epoch % cfg.training.checkpoint_interval == 0
-                or (epoch == cfg.training.num_epochs - 1)
-                or should_stop
-            ):
+            if epoch % cfg.training.checkpoint_interval == 0 or is_last or should_stop:
                 torch.save(
                     {
                         "model": model.state_dict(),
@@ -713,7 +795,7 @@ def run_train_epoch(
     bpe = batches_per_epoch_train(cfg)
     epoch_bar = tqdm.tqdm(
         total=cfg.training.batch_size * bpe,
-        desc=f"T{epoch:>4d}",
+        desc=f"Train {epoch:>4d}",
         unit="img",
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
@@ -784,6 +866,13 @@ def batches_per_epoch_val(cfg: DictConfig) -> int:
     )
 
 
+def batches_per_epoch_test(cfg: DictConfig) -> int:
+    """Compute number of batches in one test epoch."""
+    return batches_per_epoch(
+        cfg.data.test.max_samples, cfg.training.batch_size, drop_last=False
+    )
+
+
 @torch.no_grad()
 def run_val_epoch(
     cfg: DictConfig,
@@ -816,7 +905,7 @@ def run_val_epoch(
     bpe = batches_per_epoch_val(cfg)
     epoch_bar = tqdm.tqdm(
         total=cfg.data.val.max_samples,
-        desc=f"V{epoch:>4d}",
+        desc=f"Val   {epoch:>4d}",
         unit="img",
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
@@ -1148,4 +1237,78 @@ def run_viz(
         {k: wandb.Image(v) for k, v in wandb_imgs.items()},
         step=int(step_counter),
         commit=False,
+    )
+
+
+@torch.no_grad()
+def run_test_segmentation(
+    cfg: DictConfig,
+    ds_test: tf.data.Dataset,
+    epoch: int,
+    model: Model,
+    step_counter: StepCounter,
+):
+    model.eval()
+    num_patches = np.array(cfg.data.crop_size) // np.array(
+        cfg.model.backbone.patch_size
+    )
+
+    ious = []
+    dices = []
+
+    epoch_bar = tqdm.tqdm(
+        total=cfg.data.test.max_samples,
+        desc=f"Test  {epoch:>4d}",
+        unit="img",
+        bar_format=(
+            "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
+            "{elapsed}<{remaining}, {rate_fmt}{postfix}"
+        ),
+    )
+    for examples in ds_test.as_numpy_iterator():
+        B = examples["image"].shape[0]
+
+        images = torch.from_numpy(np.copy(examples["image"])).to(cfg.other.device)
+        masks = torch.from_numpy(np.copy(examples["mask"])).to(cfg.other.device)
+
+        with vit_slot_forward_with_attns(model) as f:
+            _, _, slot_attns = f(images)
+
+        slot_rollout = slot_attns[sorted(slot_attns.keys())[0]]
+        slot_rollout = torch.nn.functional.interpolate(
+            einops.rearrange(
+                slot_rollout,
+                "B S (K_h K_w) -> B S K_h K_w",
+                K_h=num_patches[0],
+                K_w=num_patches[1],
+            ),
+            tuple(cfg.data.crop_size),
+            mode="nearest",
+        )
+        slot_rollout_thres = batched_otsu_pt(slot_rollout)
+        _, iou_val, _, dice_val = match_segmentation_masks(
+            masks, slot_rollout, slot_rollout_thres
+        )
+        iou_val = iou_val.cpu().numpy()
+        dice_val = dice_val.cpu().numpy()
+
+        # TODO: if first batch, save figure with attns, masks, matching and iou to wandb
+
+        visibility = examples["visibility"]
+        ious.extend(iou_val[b, visibility[b]] for b in range(B))
+        dices.extend(dice_val[b, visibility[b]] for b in range(B))
+        epoch_bar.update(B)
+
+    epoch_bar.close()
+    wandb.log(
+        {
+            "test/iou/by_img_no_bg": np.mean(
+                [img_ious[1:].mean() for img_ious in ious]
+            ),
+            "test/dice/by_img_no_bg": np.mean(
+                [img_dices[1:].mean() for img_dices in dices]
+            ),
+        },
+        commit=False,
+        step=int(step_counter),
     )

@@ -18,6 +18,8 @@ import tensorflow as tf
 import tqdm
 
 from osc.data.tfrecords import deserialize_image, serialize_image
+from osc.data.utils import normalize_tf
+from osc.utils import ImgMean, ImgSizeHW, ImgStd
 
 IMAGE_SIZE = multi_object_datasets.clevr_with_masks.IMAGE_SIZE
 MAX_NUM_ENTITIES = multi_object_datasets.clevr_with_masks.MAX_NUM_ENTITIES
@@ -113,7 +115,9 @@ def show_sample(sample):
     fig, axs = plt.subplots(
         1,
         1 + sample["mask"].shape[0],
-        figsize=np.array([3, 2]) * np.array([1 + sample["mask"].shape[0], 1]),
+        figsize=2
+        * np.array([IMAGE_SIZE[1] / IMAGE_SIZE[0], 1])
+        * np.array([1 + sample["mask"].shape[0], 1]),
         sharex=True,
         sharey=True,
     )
@@ -126,6 +130,7 @@ def show_sample(sample):
         axs[m + 1].set_title(f"mask {m}")
 
     fig.set_facecolor("white")
+    fig.tight_layout()
     IPython.display.display(fig)
     plt.close(fig)
 
@@ -151,6 +156,58 @@ def fix_tf_dtypes(sample):
     sample["mask"] = tf.cast(tf.squeeze(sample["mask"], -1), tf.bool)
     sample["visibility"] = tf.cast(sample["visibility"], tf.bool)
     return sample
+
+
+@tf.function
+def prepare_test_segmentation(
+    example,
+    img_size: ImgSizeHW,
+    crop_size: ImgSizeHW,
+    mean: ImgMean,
+    std: ImgStd,
+):
+    """Prepare a test example for segmentation (center crop+normalization)
+
+    Args:
+        example:
+        img_size: image size ``(H, W)``
+        crop_size: crop size ``(H, W)``
+        mean: image mean for normalization
+        std: image standard deviation for normalization
+
+    Returns:
+        A dict containing the image ``[3 H W]``, the mask ``[C H W]`` and
+        a bool vector of object visibility ``[C]``
+    """
+    # image: [H W 3]
+    # mask: [C H W]
+    image = example["image"]
+    mask = example["mask"]
+
+    H, W = img_size
+    S = min(H, W)
+    y0 = (H - S) // 2
+    x0 = (W - S) // 2
+    y1 = (H + S) // 2
+    x1 = (W + S) // 2
+
+    image = image[y0:y1, x0:x1, :]
+    mask = mask[:, y0:y1, x0:x1]
+
+    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = normalize_tf(image, mean, std)
+    image = tf.image.resize(image, crop_size)
+    image = tf.transpose(image, [2, 0, 1])
+
+    mask = tf.cast(mask, tf.uint8)
+    mask = tf.transpose(mask, [1, 2, 0])
+    mask = tf.image.resize(mask, crop_size)
+    mask = tf.transpose(mask, [2, 0, 1])
+    mask = tf.cast(mask, tf.bool)
+
+    # image: [3 H W]
+    # mask: [C H W]
+    return {"image": image, "mask": mask, "visibility": example["visibility"]}
 
 
 def get_iterator(
