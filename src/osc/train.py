@@ -36,14 +36,14 @@ from osc.loss_objects import (
     matching_contrastive_loss_per_img,
 )
 from osc.lr_scheduler import LinearWarmupCosineAnneal
-from osc.models.attentions import SlotAttention
+from osc.models.attentions import CrossAttentionDecoder, SlotAttention
 from osc.models.embeds import (
     KmeansEuclideanObjectTokens,
     LearnedObjectTokens,
     PositionalEmbedding,
     SampledObjectTokens,
 )
-from osc.models.models import Model, ModelOutput, vit_slot_forward_with_attns
+from osc.models.models import Model, ModelOutput, forward_with_attns
 from osc.models.utils import MLP
 from osc.models.vit import ViTBackbone
 from osc.utils import SigIntCatcher, StepCounter, batches_per_epoch, seed_everything
@@ -51,7 +51,7 @@ from osc.viz.backbone import kmeans_clusters
 from osc.viz.embeds import viz_positional_embedding
 from osc.viz.loss_global import viz_contrastive_loss_global_probs
 from osc.viz.loss_objects import viz_contrastive_loss_objects_probs
-from osc.viz.rollout import self_attn_rollout, slot_attn_rollout
+from osc.viz.rollout import cross_attn_rollout, self_attn_rollout, slot_attn_rollout
 from osc.viz.segmentation import match_segmentation_masks
 from osc.viz.utils import array_to_pil, batched_otsu_pt, make_grid_pil
 from osc.wandb_utils import setup_wandb
@@ -266,6 +266,17 @@ def build_model(cfg: DictConfig) -> Model:
             hidden_dim=int(
                 np.round(cfg.model.obj_fn.hidden_mult * cfg.model.backbone.embed_dim)
             ),
+        )
+    elif cfg.model.obj_fn.name == "cross-attention":
+        obj_fn = CrossAttentionDecoder(
+            dim=cfg.model.backbone.embed_dim,
+            num_layers=cfg.model.obj_fn.num_layers,
+            num_heads=cfg.model.obj_fn.num_heads,
+            pos_embed=obj_fn_pos_embed,
+            block_drop=cfg.model.obj_fn.block_drop,
+            block_attn_drop=cfg.model.obj_fn.block_attn_drop,
+            drop_path=cfg.model.obj_fn.drop_path,
+            mlp_ratio=cfg.model.obj_fn.mlp_ratio,
         )
     else:
         raise ValueError(cfg.model.obj_fn.name)
@@ -708,6 +719,7 @@ def run_train_val_viz_epochs(
         scheduler:
         ds_train:
         ds_val:
+        ds_test:
         viz_batch:
         loss_fn_global:
         loss_fn_objects:
@@ -1027,12 +1039,8 @@ def run_viz(
 
     # region Forward pass and save attn matrices
     model.eval()
-    with vit_slot_forward_with_attns(model) as f:
-        (
-            output,
-            vit_attns,
-            slot_attns,
-        ) = f(einops.rearrange(images, "A B C H W -> (A B) C H W"))
+    with forward_with_attns(model) as attns:
+        output = model(einops.rearrange(images, "A B C H W -> (A B) C H W"))
     torch.save(
         {
             "f_backbone": output.f_backbone,
@@ -1040,8 +1048,7 @@ def run_viz(
             "f_slots": output.f_slots,
             "p_global": output.p_global,
             "p_slots": output.p_slots,
-            "vit_attns": vit_attns,
-            "slot_attns": slot_attns,
+            "attns": attns,
         },
         epoch_dir / "viz.pth",
     )
@@ -1072,6 +1079,7 @@ def run_viz(
     B = cfg.data.viz.max_samples
     S = cfg.model.obj_queries.num_objects
 
+    vit_attns = {k: attns[k] for k in attns.keys() if k.startswith("backbone.")}
     vit_rollout = self_attn_rollout(vit_attns, global_avg_pool=False)
     if cfg.model.backbone.global_pool == "cls":
         # split and re-normalize vit_rollout: [AB 1+Q 1+K] -> [AB 1 K], [AB Q K]
@@ -1084,14 +1092,25 @@ def run_viz(
     else:
         raise ValueError(cfg.model.backbone.global_pool)
 
-    slot_rollout = slot_attn_rollout(slot_attns)
-    slot_rollout_full = torch.bmm(slot_rollout, vit_rollout)
+    if cfg.model.obj_fn.name == "slot-attention":
+        obj_attns = {
+            k: attns[k] for k in attns.keys() if k.startswith("obj_fn.slot_attn.")
+        }
+        obj_rollout = slot_attn_rollout(obj_attns)
+    elif cfg.model.obj_fn.name == "cross-attention":
+        obj_attns = {
+            k: attns[k] for k in attns.keys() if k.startswith("obj_fn.attn_blocks.")
+        }
+        obj_rollout = cross_attn_rollout(obj_attns)
+    else:
+        raise ValueError(cfg.model.obj_fn.name)
+    obj_rollout_full = torch.bmm(obj_rollout, vit_rollout)
 
     if cfg.model.architecture == "backbone(-global_fn-global_proj)-obj_fn-obj_proj":
         global_rollout = global_rollout
     elif cfg.model.architecture == "backbone-obj_fn(-global_fn-global_proj)-obj_proj":
         global_rollout = einops.reduce(
-            slot_rollout_full, "AB S K -> AB K", reduction="mean"
+            obj_rollout_full, "AB S K -> AB K", reduction="mean"
         )
     else:
         raise ValueError(cfg.model.architecture)
@@ -1108,11 +1127,11 @@ def run_viz(
     global_rollout = einops.rearrange(
         global_rollout.cpu().numpy(), "(A B) (K_h K_w) -> B A K_h K_w", **shapes
     )
-    slot_rollout = einops.rearrange(
-        slot_rollout.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
+    obj_rollout = einops.rearrange(
+        obj_rollout.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
     )
-    slot_rollout_full = einops.rearrange(
-        slot_rollout_full.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
+    obj_rollout_full = einops.rearrange(
+        obj_rollout_full.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
     )
     # endregion
 
@@ -1146,7 +1165,7 @@ def run_viz(
 
         # ViT backbone, one img per head + avg head
         imgs_vit: List[List[PIL.Image.Image]] = [[img_input]]
-        for lyr, k in enumerate(sorted(vit_attns.keys())):
+        for lyr, k in enumerate(vit_attns.keys()):
             imgs_vit.append([])
             attns = vit_attns[k]
             if cfg.model.backbone.global_pool == "cls":
@@ -1195,13 +1214,30 @@ def run_viz(
         imgs_slot: List[List[PIL.Image.Image]] = [
             [img_input, img_vit_rollout],
         ]
-        for i, k in enumerate(sorted(slot_attns.keys())):
-            imgs_slot.append([])
-            for s in range(S):
-                img_slot = array_to_pil(slot_attns[k][a * B + b, s].reshape(K_h, K_w))
-                img_slot.save(d / f"obj.slot{s}.iter{i}.png")
-                img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
-                imgs_slot[-1].append(img_slot)
+        if cfg.model.obj_fn.name == "slot-attention":
+            for i, k in enumerate(obj_attns.keys()):
+                imgs_slot.append([])
+                for s in range(S):
+                    img_slot = array_to_pil(
+                        obj_attns[k][a * B + b, s].reshape(K_h, K_w)
+                    )
+                    img_slot.save(d / f"obj.slot{s}.iter{i}.png")
+                    img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
+                    imgs_slot[-1].append(img_slot)
+        elif cfg.model.obj_fn.name == "cross-attention":
+            for i, k in enumerate(
+                [k for k in obj_attns.keys() if k.endswith(".cross_attn")]
+            ):
+                imgs_slot.append([])
+                for s in range(S):
+                    img_slot = array_to_pil(
+                        obj_attns[k].mean(dim=1)[a * B + b, s].reshape(K_h, K_w)
+                    )
+                    img_slot.save(d / f"obj.cross{s}.block{i}.png")
+                    img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
+                    imgs_slot[-1].append(img_slot)
+        else:
+            raise ValueError(cfg.model.obj_fn.name)
         imgs_slot.append([])  # for each slot, rollout of slot attn only
         imgs_slot.append([])  # for each slot, full rollout to the input
 
@@ -1212,13 +1248,13 @@ def run_viz(
             [],  # for each slot, full rollout to the input
         ]
         for s in range(S):
-            img_slot_rollout = array_to_pil(slot_rollout[b, a, s], cmap="inferno")
+            img_slot_rollout = array_to_pil(obj_rollout[b, a, s], cmap="inferno")
             img_slot_rollout.save(d / f"obj.slot{s}.rollout.png")
             img_slot_rollout = img_slot_rollout.resize(WH, resample=PIL.Image.NEAREST)
             imgs_slot[-2].append(img_slot_rollout)
             imgs_summary[-2].append(img_slot_rollout)
 
-            img_slot_r_full = array_to_pil(slot_rollout_full[b, a, s], cmap="inferno")
+            img_slot_r_full = array_to_pil(obj_rollout_full[b, a, s], cmap="inferno")
             img_slot_r_full.save(d / f"obj.slot{s}.rollout_full.png")
             img_slot_r_full = img_slot_r_full.resize(WH, resample=PIL.Image.NEAREST)
             imgs_slot[-1].append(img_slot_r_full)
@@ -1271,13 +1307,22 @@ def run_test_segmentation(
         images = torch.from_numpy(np.copy(examples["image"])).to(cfg.other.device)
         masks = torch.from_numpy(np.copy(examples["mask"])).to(cfg.other.device)
 
-        with vit_slot_forward_with_attns(model) as f:
-            _, _, slot_attns = f(images)
+        with forward_with_attns(model) as attns:
+            _ = model(images)
 
-        slot_rollout = slot_attns[sorted(slot_attns.keys())[0]]
-        slot_rollout = torch.nn.functional.interpolate(
+        if cfg.model.obj_fn.name == "slot-attention":
+            obj_rollout = attns["obj_fn.slot_attn.0"]
+        elif cfg.model.obj_fn.name == "cross-attention":
+            # TODO: check if this works well for segmentation
+            obj_rollout = attns["obj_fn.attn_blocks.0.cross_attn"]
+            obj_rollout = einops.reduce(
+                obj_rollout, "B heads S K -> B S K", reduction="mean"
+            )
+        else:
+            raise ValueError(cfg.model.obj_fn.name)
+        obj_rollout = torch.nn.functional.interpolate(
             einops.rearrange(
-                slot_rollout,
+                obj_rollout,
                 "B S (K_h K_w) -> B S K_h K_w",
                 K_h=num_patches[0],
                 K_w=num_patches[1],
@@ -1285,9 +1330,9 @@ def run_test_segmentation(
             tuple(cfg.data.crop_size),
             mode="nearest",
         )
-        slot_rollout_thres = batched_otsu_pt(slot_rollout)
+        obj_rollout_thres = batched_otsu_pt(obj_rollout)
         _, iou_val, _, dice_val = match_segmentation_masks(
-            masks, slot_rollout, slot_rollout_thres
+            masks, obj_rollout, obj_rollout_thres
         )
         iou_val = iou_val.cpu().numpy()
         dice_val = dice_val.cpu().numpy()

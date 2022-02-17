@@ -11,6 +11,7 @@ from typing import Tuple
 
 import numpy as np
 import opt_einsum
+import timm.models.vision_transformer
 import torch
 from einops.layers.torch import Rearrange
 from timm.models.layers import DropPath, Mlp
@@ -95,10 +96,6 @@ class SelfAttention(nn.Module):
 
 class CrossAttention(nn.Module):
     """Cross attention.
-
-    Diagram::
-
-        TODO
 
     Check the :func:`forward` method.
     """
@@ -368,6 +365,40 @@ class SelfAttentionBlock(nn.Module):
 class CrossAttentionBlock(nn.Module):
     """Cross attention block.
 
+    Diagram::
+
+             x   ctx
+         ┌───┤    │
+         │   ▼    │
+         │ norm   │
+         │   │    │
+         │   ▼    │
+         │ self   │
+         │ attn   │
+         │   │    │
+         │   ▼    │
+         └──►+    │
+         ┌───┤    │
+         │   ▼    │
+         │ norm   │
+         │   │    │
+         │   ▼    │
+         │ cross◄─┘
+         │ attn
+         │   │
+         │   ▼
+         └──►+
+         ┌───┤
+         │   ▼
+         │ norm
+         │   │
+         │   ▼
+         │  MLP
+         │   │
+         │   ▼
+         └──►+
+             ▼
+
     Check the :func:`forward` method.
     """
 
@@ -397,9 +428,16 @@ class CrossAttentionBlock(nn.Module):
             norm_layer:
         """
         super().__init__()
-        self.norm1_x = norm_layer(dim)
-        self.norm1_ctx = norm_layer(dim)
-        self.attn = CrossAttention(
+        self.norm1 = norm_layer(dim)
+        self.self_attn = SelfAttention(
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            attn_drop=attn_drop,
+            proj_drop=drop,
+        )
+        self.norm2 = norm_layer(dim)
+        self.cross_attn = CrossAttention(
             dim,
             num_heads=num_heads,
             qkv_bias=qkv_bias,
@@ -407,7 +445,7 @@ class CrossAttentionBlock(nn.Module):
             proj_drop=drop,
         )
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
-        self.norm2 = norm_layer(dim)
+        self.norm3 = norm_layer(dim)
         self.mlp = Mlp(
             in_features=dim,
             hidden_features=int(np.round(dim * mlp_ratio)),
@@ -426,8 +464,9 @@ class CrossAttentionBlock(nn.Module):
             Tensor of shape ``[B Q C]``.
         """
 
-        x = x + self.drop_path(self.attn(self.norm1_x(x), self.norm1_ctx(ctx)))
-        x = x + self.drop_path(self.mlp(self.norm2(x)))
+        x = x + self.drop_path(self.self_attn(self.norm1(x)))
+        x = x + self.drop_path(self.cross_attn(self.norm2(x), ctx))
+        x = x + self.drop_path(self.mlp(self.norm3(x)))
         return x
 
 
@@ -466,3 +505,76 @@ class CoAttentionBlock(nn.Module):
         new_a = self.cross_a_b(a, b)
         new_b = self.cross_b_a(b, a)
         return new_a, new_b
+
+
+class CrossAttentionDecoder(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        pos_embed=None,
+        num_heads: int = 4,
+        num_layers: int = 3,
+        block_drop: float = 0.0,
+        block_attn_drop: float = 0.0,
+        drop_path: float = 0.0,
+        mlp_ratio: float = 4.0,
+    ):
+        """Init.
+
+        Args:
+            dim:
+            pos_embed:
+            num_heads:
+            num_layers:
+            block_drop:
+            block_attn_drop:
+            drop_path:
+            mlp_ratio:
+        """
+        super(CrossAttentionDecoder, self).__init__()
+
+        if pos_embed is None or pos_embed == "none":
+            pos_embed = nn.Identity()
+        self.pos_embed = pos_embed
+
+        self.inputs_norm = nn.LayerNorm(dim)
+
+        # B N C -> B N C
+        self.attn_blocks = nn.ModuleList(
+            [
+                CrossAttentionBlock(
+                    dim=dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=False,
+                    drop=block_drop,
+                    attn_drop=block_attn_drop,
+                    drop_path=drop_path,
+                    act_layer=nn.GELU,
+                    norm_layer=nn.LayerNorm,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+
+        self.init_weights()
+
+    def init_weights(self):
+        # noinspection PyProtectedMember
+        self.apply(timm.models.vision_transformer._init_vit_weights)
+
+    def forward(self, obj_queries: torch.Tensor, inputs: torch.Tensor) -> torch.Tensor:
+        """Forward.
+
+        Args:
+            obj_queries: query tensor of shape ``[B S C]``
+            inputs: key-value tensor of shape ``[B N C]``
+
+        Returns:
+            Tensor of shape ``[B S C]``.
+        """
+        inputs = self.inputs_norm(self.pos_embed(inputs))
+        for i, block in enumerate(self.attn_blocks):
+            obj_queries = block(obj_queries, inputs)
+
+        return obj_queries

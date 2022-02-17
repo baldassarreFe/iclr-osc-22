@@ -1,5 +1,8 @@
 name: 'cross-attention'
-hidden_mult: 2.0
 pos_embed: null
 num_layers: 2
 num_heads: 4
+block_drop: 0.0
+block_attn_drop: 0.0
+drop_path: 0.0
+mlp_ratio: 2.0

@@ -165,6 +165,22 @@ def normalize_sum_to_one(tensor: torch.Tensor, dim: int = -1) -> torch.Tensor:
     return tensor / tensor.sum(dim=dim, keepdim=True).clamp_min(1e-8)
 
 
+def fill_diagonal_(x: torch.Tensor, value: float = -torch.inf) -> torch.Tensor:
+    """Fill diagonal of torch tensor, batched and in-place.
+
+    Args:
+        x: ``[..., N, M]`` tensor with leading batch dimensions.
+        value: value to fill the diagonal with.
+
+    Returns:
+        The same ``[..., N, M]`` input tensor with diagonal entries
+        ``x[..., i, i]`` replaced.
+    """
+    N, M = x.shape[-2:]
+    mask = torch.eye(N, M, dtype=torch.bool, device=x.device)
+    return x.masked_fill_(mask, value)
+
+
 class SigIntCatcher(AbstractContextManager):
     """Context manager to gracefully handle SIGINT or KeyboardInterrupt.
 

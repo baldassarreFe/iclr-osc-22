@@ -3,7 +3,7 @@ from typing import Callable, Mapping, Sequence, Union
 import einops
 import torch
 
-from osc.utils import normalize_sum_to_one
+from osc.utils import fill_diagonal_, normalize_sum_to_one
 
 
 def self_attn_rollout(
@@ -77,3 +77,43 @@ def slot_attn_rollout(attns, normalize="layer"):
     else:
         raise ValueError(normalize)
     return rollout
+
+
+def cross_attn_rollout(attns):
+    """Cross attention rollout: how much an object token attends to context tokens.
+
+    Args:
+        attns: dict or list where entries alternate
+            self attention with shape ``[B heads S S]``
+            and cross attention with shape ``[B heads S K]``.
+
+    Returns:
+        Rollout, shape ``[B S K]``
+    """
+    if len(attns) % 2 != 0:
+        raise ValueError("Must be pairs of self and cross attn")
+    if isinstance(attns, Mapping):
+        attns = list(attns.values())
+    if isinstance(attns, Sequence):
+        attns = [a.detach().mean(dim=1) for a in attns]
+
+    device = attns[0].device
+    B, S, S = attns[0].shape
+    B, S, K = attns[1].shape
+    id_ss = fill_diagonal_(torch.zeros(B, S, S, device=device), 1.0)
+    R_ss = id_ss.clone()
+    R_sk = torch.zeros(B, S, K, device=device)
+
+    for attn in attns:
+        if attn.shape == (B, S, S):
+            # Self attention
+            R_ss.add_(torch.bmm(attn, R_ss))
+            R_sk.add_(torch.bmm(attn, R_sk))
+        elif attn.shape == (B, S, K):
+            # Cross attention
+            R_ss_bar = normalize_sum_to_one(R_ss - id_ss) + id_ss
+            R_sk.add_(torch.bmm(R_ss_bar.transpose(-2, -1), attn))
+        else:
+            raise ValueError(attn.shape)
+
+    return normalize_sum_to_one(R_sk)

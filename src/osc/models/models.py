@@ -3,13 +3,15 @@ Model definitions and wrappers to get attention maps.
 """
 
 from contextlib import contextmanager
-from typing import Dict, List, NamedTuple
+from typing import Dict, Generator, List, NamedTuple
 
 import torch
 import torch.nn as nn
 from torch.utils.hooks import RemovableHandle
 
-from .attentions import SelfAttentionBlock, SlotAttention
+from osc.models.attentions import CrossAttention, SelfAttention
+
+from .attentions import SlotAttention
 from .embeds import (
     KmeansCosineObjectTokens,
     KmeansEuclideanObjectTokens,
@@ -100,43 +102,54 @@ class Model(nn.Module):
 
 
 @contextmanager
-def vit_slot_forward_with_attns(model: Model):
-    module_to_name: Dict[nn.Module, str] = {}
-    vit_attns: Dict[str, torch.Tensor] = {
-        # module_name: attn tensor [(A B) heads Q K]
+def forward_with_attns(model: Model) -> Generator[Dict[str, torch.Tensor], None, None]:
+    """Context manager to set and remove hooks that collect attention maps.
+
+    Example:
+        Usage::
+
+        >>> with forward_with_attns(model) as attns:
+        >>>     outputs = model(inputs)
+        >>> print(attns.items())
+
+    Args:
+        model: Model where the attention hooks will be set.
+
+    Yields:
+        A dictionary that will be populated after the forward pass.
+    """
+    module_to_name: Dict[nn.Module, str] = {
+        # nn.Module: name
     }
-    slot_attns: Dict[str, torch.Tensor] = {
-        # iteration_id: attn tensor [(A B) slot K]
+    attns: Dict[str, torch.Tensor] = {
+        # backbone.attn_blocks.*:          [AB heads Q K]
+        # obj_fn.slot_attn.*:              [AB       S K]
+        # obj_fn.attn_blocks.*.self_attn:  [AB heads S S]
+        # obj_fn.attn_blocks.*.cross_attn: [AB heads S K]
     }
 
-    def vit_hook(m, inputs):
-        (attns,) = inputs
-        vit_attns[module_to_name[m]] = attns.detach()
+    def normal_hook(m, inputs):
+        (a,) = inputs
+        attns[module_to_name[m]] = a.detach()
 
     def slot_hook(m, inputs):
-        ((attns, iter_idx),) = inputs
-        slot_attns[f"{module_to_name[m]}.{iter_idx}"] = attns.detach()
-
-    def sort_dict(d):
-        return {k: d[k] for k in sorted(d.keys())}
+        ((a, iter_idx),) = inputs
+        attns[f"{module_to_name[m]}.slot_attn.{iter_idx}"] = a.detach()
 
     handles: List[RemovableHandle] = []
     for name, module in model.named_modules():
-        if isinstance(module, SelfAttentionBlock):
-            module_to_name[module.attn.attn_drop] = name
-            handle = module.attn.attn_drop.register_forward_pre_hook(vit_hook)
+        if isinstance(module, (SelfAttention, CrossAttention)):
+            module_to_name[module.attn_drop] = name
+            handle = module.attn_drop.register_forward_pre_hook(normal_hook)
             handles.append(handle)
+
         elif isinstance(module, SlotAttention):
             module_to_name[module.dot_prod_softmax] = name
             handle = module.dot_prod_softmax.register_forward_pre_hook(slot_hook)
             handles.append(handle)
 
-    def wrapped_forward(*inputs):
-        outputs = model(*inputs)
-        return outputs, sort_dict(vit_attns), sort_dict(slot_attns)
-
     try:
-        yield wrapped_forward
+        yield attns
     finally:
         for handle in handles:
             handle.remove()
