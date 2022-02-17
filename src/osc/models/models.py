@@ -3,7 +3,7 @@ Model definitions and wrappers to get attention maps.
 """
 
 from contextlib import contextmanager
-from typing import Dict, Generator, List, NamedTuple
+from typing import Dict, Generator, List, NamedTuple, Optional
 
 import torch
 import torch.nn as nn
@@ -25,22 +25,27 @@ class ModelOutput(NamedTuple):
 
     Fields:
 
-    - f_backbone: backbone features, shape ``[B N C]``
-    - f_global: global features, shape ``[B C]``
-    - f_slots: object features, shape ``[B C]``
-    - p_global: global projections, shape ``[B S C]``
-    - p_slots: object projections shape ``[B S C]``
+    - ``f_backbone``: backbone features,  shape ``[B N C]``
+    - ``f_global``:   global features,    shape ``[B C]``
+    - ``f_slots``:    object features,    shape ``[B C]``
+    - ``p_global``:   global projections, shape ``[B S C]``
+    - ``p_slots``:    object projections, shape ``[B S C]``
 
     """
 
     f_backbone: torch.Tensor
     f_global: torch.Tensor
-    f_slots: torch.Tensor
+    f_slots: Optional[torch.Tensor]
     p_global: torch.Tensor
-    p_slots: torch.Tensor
+    p_slots: Optional[torch.Tensor]
 
 
 class Model(nn.Module):
+    """Core model.
+
+    See :func:``forward`` method.
+    """
+
     def __init__(
         self,
         *,
@@ -48,9 +53,9 @@ class Model(nn.Module):
         backbone,
         global_fn,
         global_proj,
-        obj_queries,
-        obj_fn,
-        obj_proj,
+        obj_queries=None,
+        obj_fn=None,
+        obj_proj=None,
     ):
         super(Model, self).__init__()
         self.architecture = architecture
@@ -60,45 +65,85 @@ class Model(nn.Module):
         self.global_fn = global_fn
         self.global_proj = global_proj
 
+        if architecture == "backbone-global_fn-global_proj":
+            if any(m is not None for m in [obj_queries, obj_fn, obj_proj]):
+                raise ValueError(
+                    f"With {architecture}, all `obj_*` parameters must be None."
+                )
+        else:
+            if any(m is None for m in [obj_queries, obj_fn, obj_proj]):
+                raise ValueError(
+                    f"With {architecture}, all `obj_*` parameters must not be None."
+                )
+
         self.obj_queries = obj_queries
         self.obj_fn = obj_fn
         self.obj_proj = obj_proj
 
     def forward(self, images: torch.Tensor) -> ModelOutput:
-        # images: B 3 H W
-        B = images.shape[0]
+        """Forward.
 
-        # f_global: [B C]
-        # f_backbone: [B N C]
-        f_global, f_backbone = self.backbone(images)
+        Args:
+            images: float tensor of shape ``[B 3 H W]``
 
-        # q_objs: [B S C]
+        Returns:
+            A :class:``ModelOutput`` tuple containing per-patch backbone features,
+            global features, global projections, object features, object projections.
+        """
+
+        # f_backbone_pool: [B C]
+        # f_backbone_patch: [B N C] with N = H*W // num_patches
+        f_backbone_pool, f_backbone_patch = self.backbone(images)
+
+        if self.architecture == "backbone-global_fn-global_proj":
+            f_global = self.global_fn(f_backbone_pool)
+            p_global = self.global_proj(f_global)
+            f_slots = None
+            p_slots = None
+            return ModelOutput(f_backbone_patch, f_global, f_slots, p_global, p_slots)
+
+        if self.architecture == "backbone(-global_fn-global_proj)-obj_fn-obj_proj":
+            f_global = self.global_fn(f_backbone_pool)
+            p_global = self.global_proj(f_global)
+
+            # q_objs: [B S C]
+            q_objs = self._get_q_objs(f_backbone_patch)
+
+            # f_slots, p_slots: [B S C]
+            f_slots = self.obj_fn(q_objs, f_backbone_patch)
+            p_slots = self.obj_proj(f_slots)
+
+            return ModelOutput(f_backbone_patch, f_global, f_slots, p_global, p_slots)
+
+        if self.architecture == "backbone-obj_fn(-global_fn-global_proj)-obj_proj":
+            # q_objs: [B S C]
+            q_objs = self._get_q_objs(f_backbone_patch)
+
+            # f_slots, p_slots: [B S C]
+            f_slots = self.obj_fn(q_objs, f_backbone_patch)
+            p_slots = self.obj_proj(f_slots)
+
+            f_global = self.global_fn(f_slots.mean(dim=1))
+            p_global = self.global_proj(f_global)
+
+            return ModelOutput(f_backbone_patch, f_global, f_slots, p_global, p_slots)
+
+        raise ValueError(self.architecture)
+
+    def _get_q_objs(self, f_backbone_patch):
+        B, N, C = f_backbone_patch.shape
         if isinstance(self.obj_queries, SampledObjectTokens):
-            q_objs = self.obj_queries(B)
-        elif isinstance(self.obj_queries, LearnedObjectTokens):
-            q_objs = self.obj_queries().expand(B, -1, -1)
-        elif isinstance(
+            return self.obj_queries(B)
+
+        if isinstance(self.obj_queries, LearnedObjectTokens):
+            return self.obj_queries().expand(B, -1, -1)
+
+        if isinstance(
             self.obj_queries, (KmeansCosineObjectTokens, KmeansEuclideanObjectTokens)
         ):
-            q_objs = self.obj_queries.forward(f_backbone)
-        else:
-            raise TypeError(type(self.obj_queries))
+            return self.obj_queries(f_backbone_patch)
 
-        # f_slots, p_slots: [B S C]
-        f_slots = self.obj_fn(q_objs, f_backbone)
-        p_slots = self.obj_proj(f_slots)
-
-        # f_global, p_global: [B C]
-        if self.architecture == "backbone(-global_fn-global_proj)-obj_fn-obj_proj":
-            f_global = f_global
-        elif self.architecture == "backbone-obj_fn(-global_fn-global_proj)-obj_proj":
-            f_global = f_slots.mean(dim=1)
-        else:
-            raise ValueError(self.architecture)
-        f_global = self.global_fn(f_global)
-        p_global = self.global_proj(f_global)
-
-        return ModelOutput(f_backbone, f_global, f_slots, p_global, p_slots)
+        raise TypeError(type(self.obj_queries))
 
 
 @contextmanager

@@ -1,0 +1,4 @@
+hidden_mult: 2.0
+activation: 'gelu'
+dropout: 0.0
+out_bias: false

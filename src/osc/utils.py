@@ -241,3 +241,28 @@ class StepCounter(object):
 
     def __str__(self):
         return f"{self.__class__.__name__}({int(self)})"
+
+
+class AverageMetric(object):
+    """Keep track of the average value of a metric across batches"""
+
+    def __init__(self):
+        self.total = 0.0
+        self.count = 0
+
+    def update(self, values: torch.Tensor):
+        """Update.
+
+        Args:
+            values: a 1D tensor of per-sample metric values.
+        """
+        self.total += values.detach().sum().item()
+        self.count += values.numel()
+
+    def compute(self) -> float:
+        """Compute.
+
+        Returns:
+            The current average.
+        """
+        return self.total / self.count

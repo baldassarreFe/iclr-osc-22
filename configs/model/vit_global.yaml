@@ -1,0 +1,8 @@
+defaults:
+  - common
+  - _self_
+
+architecture: 'backbone-global_fn-global_proj'
+
+# This model doesn't output object features/projections,
+# make sure to run with ./train.py losses/l_objects=none

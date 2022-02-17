@@ -35,15 +35,11 @@ global_proj:
   dropout: 0.0
   out_bias: false
 
-obj_queries:
-  name: "learned"
-  num_objects: 11 # S
+# Specified in its own config group, possibly missing
+obj_queries: null
 
-# Specified in its own config group
+# Specified in its own config group, possibly missing
 obj_fn: null
 
-obj_proj:
-  hidden_mult: 2.0
-  activation: 'gelu'
-  dropout: 0.0
-  out_bias: false
+# Specified in its own config group, possibly missing
+obj_proj: null

@@ -5,12 +5,12 @@ Main training methods.
 import logging
 import random
 import time
+from collections import defaultdict
 from functools import partial
 from itertools import islice
 from pathlib import Path
-from typing import Iterable, List, Optional, Protocol, Tuple
+from typing import Iterable, List, Optional, Protocol
 
-import einops
 import hydra
 import multi_object_datasets.clevr_with_masks
 import namesgenerator
@@ -24,6 +24,7 @@ import torch.nn.functional
 import tqdm
 import wandb
 import wandb.util
+from einops import rearrange, reduce
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
 
@@ -46,7 +47,14 @@ from osc.models.embeds import (
 from osc.models.models import Model, ModelOutput, forward_with_attns
 from osc.models.utils import MLP
 from osc.models.vit import ViTBackbone
-from osc.utils import SigIntCatcher, StepCounter, batches_per_epoch, seed_everything
+from osc.utils import (
+    AverageMetric,
+    SigIntCatcher,
+    StepCounter,
+    batches_per_epoch,
+    normalize_sum_to_one,
+    seed_everything,
+)
 from osc.viz.backbone import kmeans_clusters
 from osc.viz.embeds import viz_positional_embedding
 from osc.viz.loss_global import viz_contrastive_loss_global_probs
@@ -78,7 +86,8 @@ def main(cfg: DictConfig) -> None:
 
     optimizer = build_optimizer(cfg, model)
     scheduler = build_scheduler(cfg, optimizer)
-    loss_fn_global, loss_fn_objects = build_losses(cfg)
+    loss_fn_global = build_loss_fn_global(cfg)
+    loss_fn_objects = build_loss_fn_objects(cfg)
     run_train_val_viz_epochs(
         cfg,
         model,
@@ -103,7 +112,7 @@ def update_cfg(cfg: DictConfig, readonly=True):
         OmegaConf.update(up, "training.checkpoint_interval", 1)
         OmegaConf.update(up, "data.train.max_samples", 10 * cfg.training.batch_size)
         OmegaConf.update(up, "data.val.max_samples", 10 * cfg.training.batch_size)
-        OmegaConf.update(up, "data.test.max_samples", 10 * cfg.training.batch_size)
+        OmegaConf.update(up, "data.test.max_samples", 5 * cfg.training.batch_size)
         OmegaConf.update(up, "data.viz.epoch_interval", 1)
         OmegaConf.update(up, "data.test.epoch_interval", 1)
         OmegaConf.update(up, "other.seed", 42)
@@ -192,7 +201,9 @@ def build_model(cfg: DictConfig) -> Model:
     else:
         raise ValueError(cfg.model.backbone.pos_embed)
 
-    if cfg.model.obj_fn.pos_embed == "backbone":
+    if cfg.model.obj_fn is None or cfg.model.obj_fn.pos_embed is None:
+        obj_fn_pos_embed = None
+    elif cfg.model.obj_fn.pos_embed == "backbone":
         obj_fn_pos_embed = backbone_pos_embed
     elif cfg.model.obj_fn.pos_embed == "learned":
         obj_fn_pos_embed = PositionalEmbedding(
@@ -200,8 +211,6 @@ def build_model(cfg: DictConfig) -> Model:
             cfg.model.backbone.embed_dim,
             dropout=cfg.model.backbone.pos_embed_dropout,
         )
-    elif cfg.model.obj_fn.pos_embed is None:
-        obj_fn_pos_embed = None
     else:
         raise ValueError(cfg.model.obj_fn.pos_embed)
 
@@ -241,7 +250,9 @@ def build_model(cfg: DictConfig) -> Model:
         dropout=0.0,
     )
 
-    if cfg.model.obj_queries.name == "sample":
+    if cfg.model.obj_queries is None:
+        obj_queries = None
+    elif cfg.model.obj_queries.name == "sample":
         obj_queries = SampledObjectTokens(
             embed_dim=cfg.model.backbone.embed_dim,
             num_objects=cfg.model.obj_queries.num_objects,
@@ -258,7 +269,9 @@ def build_model(cfg: DictConfig) -> Model:
     else:
         raise ValueError(cfg.model.obj_queries.name)
 
-    if cfg.model.obj_fn.name == "slot-attention":
+    if cfg.model.obj_fn is None:
+        obj_fn = None
+    elif cfg.model.obj_fn.name == "slot-attention":
         obj_fn = SlotAttention(
             dim=cfg.model.backbone.embed_dim,
             pos_embed=obj_fn_pos_embed,
@@ -281,14 +294,17 @@ def build_model(cfg: DictConfig) -> Model:
     else:
         raise ValueError(cfg.model.obj_fn.name)
 
-    obj_proj = MLP(
-        in_features=cfg.model.backbone.embed_dim,
-        hidden_features=4 * cfg.model.backbone.embed_dim,
-        out_features=cfg.model.backbone.embed_dim,
-        activation=activations[cfg.model.obj_proj.activation],
-        out_bias=False,
-        dropout=0.0,
-    )
+    if cfg.model.obj_proj is None:
+        obj_proj = None
+    else:
+        obj_proj = MLP(
+            in_features=cfg.model.backbone.embed_dim,
+            hidden_features=4 * cfg.model.backbone.embed_dim,
+            out_features=cfg.model.backbone.embed_dim,
+            activation=activations[cfg.model.obj_proj.activation],
+            out_bias=False,
+            dropout=0.0,
+        )
 
     return Model(
         architecture=cfg.model.architecture,
@@ -361,25 +377,28 @@ class ModelLoss(Protocol):
     """Function type signature for model loss functions."""
 
     def __call__(
-        self, output: ModelOutput, *, reduction: Optional[str] = "mean"
-    ) -> torch.Tensor:
+        self, output: ModelOutput, *, reduction: str = "mean"
+    ) -> Optional[torch.Tensor]:
         ...
 
 
-def build_losses(
-    cfg: DictConfig,
-) -> Tuple[ModelLoss, ModelLoss]:
-    """Build global and object losses."""
-    if cfg.losses.l_global.name == "sim":
+def build_loss_fn_global(cfg: DictConfig) -> ModelLoss:
+    """Build global loss function."""
+    if cfg.losses.l_global is None:
 
-        def loss_fn_global(output: ModelOutput, *, reduction="mean"):
+        def loss_fn_global(output: ModelOutput, *, reduction="mean") -> None:
+            return None
+
+    elif cfg.losses.l_global.name == "sim":
+
+        def loss_fn_global(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
             return cosine_sim_loss(
                 output.f_global, output.p_global, reduction=reduction
             )
 
     elif cfg.losses.l_global.name == "ctr":
 
-        def loss_fn_global(output: ModelOutput, *, reduction="mean"):
+        def loss_fn_global(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
             return contrastive_loss(
                 output.p_global,
                 temperature=cfg.losses.l_global.temp,
@@ -389,9 +408,24 @@ def build_losses(
     else:
         raise ValueError(cfg.losses.l_global.name)
 
-    if cfg.losses.l_objects.name == "ctr_img":
+    return loss_fn_global
 
-        def loss_fn_objects(output: ModelOutput, *, reduction="mean"):
+
+def build_loss_fn_objects(cfg: DictConfig) -> ModelLoss:
+    """Build object loss function."""
+    if cfg.model.obj_proj is None and cfg.losses.l_objects.name is not None:
+        raise ValueError(
+            "Can not build object loss if model does not output object projections."
+        )
+
+    if cfg.losses.l_objects.name is None:
+
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> None:
+            return None
+
+    elif cfg.losses.l_objects.name == "ctr_img":
+
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
             return matching_contrastive_loss_per_img(
                 output.p_slots,
                 temperature=cfg.losses.l_objects.temp,
@@ -400,7 +434,7 @@ def build_losses(
 
     elif cfg.losses.l_objects.name == "ctr_all":
 
-        def loss_fn_objects(output: ModelOutput, *, reduction="mean"):
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
             return matching_contrastive_loss(
                 output.p_slots,
                 temperature=cfg.losses.l_objects.temp,
@@ -410,7 +444,7 @@ def build_losses(
     else:
         raise ValueError(cfg.losses.l_global.name)
 
-    return loss_fn_global, loss_fn_objects
+    return loss_fn_objects
 
 
 def build_dataset_train(cfg):
@@ -820,37 +854,33 @@ def run_train_epoch(
         # f_backbone: [AB H'W' C]
         # f_global, p_global: [AB C]
         # f_slots, p_slots: [AB K C]
+        B = images.shape[1]
+        images = rearrange(images, "A B C H W -> (A B) C H W")
         images = torch.from_numpy(np.copy(images)).to(cfg.other.device)
-        output: ModelOutput = model(
-            einops.rearrange(images, "A B C H W -> (A B) C H W")
-        )
+        output: ModelOutput = model(images)
+
+        loss_dict = {}
+        loss = torch.zeros([], device=cfg.other.device)
 
         l_global = loss_fn_global(output)
+        if l_global is not None:
+            loss += cfg.losses.l_global.weight * l_global
+            loss_dict["l_global/train"] = l_global.item()
+
         l_objects = loss_fn_objects(output)
-        loss = (
-            cfg.losses.l_global.weight * l_global
-            + cfg.losses.l_objects.weight * l_objects
-        )
+        if l_objects is not None:
+            loss += cfg.losses.l_objects.weight * l_objects
+            loss_dict["l_objects/train"] = l_objects.item()
 
         wandb.log(
-            {
-                "l_global/train": l_global.item(),
-                "l_objects/train": l_objects.item(),
-                "lr": optimizer.param_groups[0]["lr"],
-            },
+            {**loss_dict, "lr": optimizer.param_groups[0]["lr"]},
             commit=False,
             step=int(step_counter),
         )
 
         now = time.time()
         if (now - last) > 60:
-            epoch_bar.set_postfix(
-                {
-                    "l_global": f"{l_global.item():.4f}",
-                    "l_objects": f"{l_objects.item():.4f}",
-                    "steps": int(step_counter),
-                }
-            )
+            epoch_bar.set_postfix({**loss_dict, "steps": int(step_counter)})
             last = now
 
         optimizer.zero_grad()
@@ -858,8 +888,7 @@ def run_train_epoch(
         optimizer.step()
         scheduler.step()
         step_counter.step()
-
-        epoch_bar.update(images.shape[1])
+        epoch_bar.update(B)
 
     epoch_bar.close()
 
@@ -908,10 +937,7 @@ def run_val_epoch(
     """
     model.eval()
 
-    l_global_sum = 0
-    l_global_div = 0
-    l_objects_sum = 0
-    l_objects_div = 0
+    loss_dict = defaultdict(AverageMetric)
 
     last = -1
     bpe = batches_per_epoch_val(cfg)
@@ -931,26 +957,22 @@ def run_val_epoch(
         # f_global, p_global: [AB C]
         # f_slots, p_slots: [AB K C]
         B = images.shape[1]
+        images = rearrange(images, "A B C H W -> (A B) C H W")
         images = torch.from_numpy(np.copy(images)).to(cfg.other.device)
-        output: ModelOutput = model(
-            einops.rearrange(images, "A B C H W -> (A B) C H W")
-        )
+        output: ModelOutput = model(images)
 
         l_global = loss_fn_global(output, reduction="none")
-        l_global_sum += l_global.sum().item()
-        l_global_div += l_global.numel()
+        if l_global is not None:
+            loss_dict["l_global/val"].update(l_global)
 
         l_objects = loss_fn_objects(output, reduction="none")
-        l_objects_sum += l_objects.sum().item()
-        l_objects_div += l_objects.numel()
+        if l_objects is not None:
+            loss_dict["l_objects/val"].update(l_objects)
 
         now = time.time()
         if (now - last) > 60:
             epoch_bar.set_postfix(
-                {
-                    "l_global": f"{l_global_sum / l_global_div:.4f}",
-                    "l_objects": f"{l_objects_sum / l_objects_div:.4f}",
-                }
+                {name: f"{am.compute():.4f}" for name, am in loss_dict.items()}
             )
             last = now
         epoch_bar.update(B)
@@ -958,10 +980,7 @@ def run_val_epoch(
     epoch_bar.close()
 
     wandb.log(
-        {
-            "l_global/val": l_global_sum / l_global_div,
-            "l_objects/val": l_objects_sum / l_objects_div,
-        },
+        {name: am.compute() for name, am in loss_dict.items()},
         commit=False,
         step=int(step_counter),
     )
@@ -992,7 +1011,7 @@ def run_viz(
     # region Prepare input images, save if it's the first epoch
     images = torch.from_numpy(np.copy(viz_batch)).to(cfg.other.device)
     images_np = (
-        einops.rearrange(
+        rearrange(
             unnormalize_pt(images, cfg.data.normalize.mean, cfg.data.normalize.std),
             "A B C H W -> B A H W C",
         )
@@ -1000,7 +1019,7 @@ def run_viz(
         .numpy()
     )
     if epoch == 0:
-        array_to_pil(einops.rearrange(images_np, "B A H W C -> (A H) (B W) C")).save(
+        array_to_pil(rearrange(images_np, "B A H W C -> (A H) (B W) C")).save(
             "viz_batch.png"
         )
     # endregion
@@ -1025,8 +1044,10 @@ def run_viz(
         )
         fig.savefig(f"epoch{epoch}/pos-embed-backbone.png", dpi=100)
         plt.close(fig)
-        wandb_imgs["pos-embed/backbone"] = fig  # f"epoch{epoch}/pos-embed-backbone.png"
-    if isinstance(model.obj_fn.pos_embed, PositionalEmbedding):
+        wandb_imgs["pos-embed/backbone"] = fig
+    if model.obj_fn is not None and isinstance(
+        model.obj_fn.pos_embed, PositionalEmbedding
+    ):
         fig = viz_positional_embedding(
             model.obj_fn.pos_embed.embed,
             num_patches=num_patches,
@@ -1034,13 +1055,13 @@ def run_viz(
         )
         fig.savefig(f"epoch{epoch}/pos-embed-obj-fn.png", dpi=100)
         plt.close(fig)
-        wandb_imgs["pos-embed/obj_fn"] = fig  # f"epoch{epoch}/pos-embed-obj-fn.png"
+        wandb_imgs["pos-embed/obj_fn"] = fig
     # endregion
 
     # region Forward pass and save attn matrices
     model.eval()
     with forward_with_attns(model) as attns:
-        output = model(einops.rearrange(images, "A B C H W -> (A B) C H W"))
+        output = model(rearrange(images, "A B C H W -> (A B) C H W"))
     torch.save(
         {
             "f_backbone": output.f_backbone,
@@ -1055,84 +1076,89 @@ def run_viz(
     # endregion
 
     # region Global loss
-    l_global = loss_fn_global(output).item()
-    fig = viz_contrastive_loss_global_probs(
-        output.p_global, temp=cfg.losses.l_global.temp, loss=l_global
-    )
-    fig.savefig(epoch_dir / "contrastive-global.png", dpi=200)
-    wandb_imgs["losses/l_global"] = fig
-    plt.close(fig)
+    l_global = loss_fn_global(output)
+    if l_global is not None:
+        fig = viz_contrastive_loss_global_probs(
+            output.p_global, temp=cfg.losses.l_global.temp, loss=l_global.item()
+        )
+        fig.savefig(epoch_dir / "contrastive-global.png", dpi=200)
+        wandb_imgs["losses/l_global"] = fig
+        plt.close(fig)
     # endregion
 
     # region Object loss
-    l_objects = loss_fn_objects(output).item()
-    fig = viz_contrastive_loss_objects_probs(
-        output.p_slots, temp=cfg.losses.l_objects.temp, loss=l_objects
-    )
-    fig.savefig(epoch_dir / "contrastive-objects.png", dpi=200)
-    wandb_imgs["losses/l_objects"] = fig
-    plt.close(fig)
+    l_objects = loss_fn_objects(output)
+    if l_objects is not None:
+        fig = viz_contrastive_loss_objects_probs(
+            output.p_slots, temp=cfg.losses.l_objects.temp, loss=l_objects.item()
+        )
+        fig.savefig(epoch_dir / "contrastive-objects.png", dpi=200)
+        wandb_imgs["losses/l_objects"] = fig
+        plt.close(fig)
     # endregion
 
     # region Compute rollouts
     A = 2
     B = cfg.data.viz.max_samples
-    S = cfg.model.obj_queries.num_objects
 
     vit_attns = {k: attns[k] for k in attns.keys() if k.startswith("backbone.")}
     vit_rollout = self_attn_rollout(vit_attns, global_avg_pool=False)
     if cfg.model.backbone.global_pool == "cls":
         # split and re-normalize vit_rollout: [AB 1+Q 1+K] -> [AB 1 K], [AB Q K]
-        global_rollout = vit_rollout[:, 0, 1:]
-        global_rollout /= global_rollout.sum(dim=-1, keepdim=True)
-        vit_rollout = vit_rollout[:, 1:, 1:]
-        vit_rollout /= vit_rollout.sum(dim=-1, keepdim=True)
+        global_rollout = normalize_sum_to_one(vit_rollout[:, 0, 1:])
+        vit_rollout = normalize_sum_to_one(vit_rollout[:, 1:, 1:])
     elif cfg.model.backbone.global_pool == "avg":
-        global_rollout = einops.reduce(vit_rollout, "AB Q K -> AB K", reduction="mean")
+        global_rollout = reduce(vit_rollout, "AB Q K -> AB K", reduction="mean")
     else:
         raise ValueError(cfg.model.backbone.global_pool)
 
-    if cfg.model.obj_fn.name == "slot-attention":
-        obj_attns = {
-            k: attns[k] for k in attns.keys() if k.startswith("obj_fn.slot_attn.")
-        }
-        obj_rollout = slot_attn_rollout(obj_attns)
-    elif cfg.model.obj_fn.name == "cross-attention":
-        obj_attns = {
-            k: attns[k] for k in attns.keys() if k.startswith("obj_fn.attn_blocks.")
-        }
-        obj_rollout = cross_attn_rollout(obj_attns)
-    else:
-        raise ValueError(cfg.model.obj_fn.name)
-    obj_rollout_full = torch.bmm(obj_rollout, vit_rollout)
+    obj_attns = None
+    obj_rollout = None
+    obj_rollout_full = None
+    if cfg.model.obj_fn is not None:
+        if cfg.model.obj_fn.name == "slot-attention":
+            obj_attns = {
+                k: attns[k] for k in attns.keys() if k.startswith("obj_fn.slot_attn.")
+            }
+            obj_rollout = slot_attn_rollout(obj_attns)
+        elif cfg.model.obj_fn.name == "cross-attention":
+            obj_attns = {
+                k: attns[k] for k in attns.keys() if k.startswith("obj_fn.attn_blocks.")
+            }
+            obj_rollout = cross_attn_rollout(obj_attns)
+        else:
+            raise ValueError(cfg.model.obj_fn.name)
+        obj_rollout_full = torch.bmm(obj_rollout, vit_rollout)
 
-    if cfg.model.architecture == "backbone(-global_fn-global_proj)-obj_fn-obj_proj":
+    if cfg.model.architecture == "backbone-global_fn-global_proj":
+        global_rollout = global_rollout
+    elif cfg.model.architecture == "backbone(-global_fn-global_proj)-obj_fn-obj_proj":
         global_rollout = global_rollout
     elif cfg.model.architecture == "backbone-obj_fn(-global_fn-global_proj)-obj_proj":
-        global_rollout = einops.reduce(
-            obj_rollout_full, "AB S K -> AB K", reduction="mean"
-        )
+        global_rollout = reduce(obj_rollout_full, "AB S K -> AB K", reduction="mean")
     else:
         raise ValueError(cfg.model.architecture)
 
-    vit_rollout = einops.reduce(vit_rollout, "AB Q K -> AB K", reduction="mean")
+    vit_rollout = reduce(vit_rollout, "AB Q K -> AB K", reduction="mean")
     # endregion
 
     # region Reshape rollouts as images
     K_h = K_w = int(np.sqrt(vit_rollout.shape[-1]))
     shapes = {"A": A, "B": B, "K_h": K_h, "K_w": K_w}
-    vit_rollout = einops.rearrange(
-        vit_rollout.cpu().numpy(), "(A B) (K_h K_w) -> B A K_h K_w", **shapes
+    vit_rollout = rearrange(
+        vit_rollout.cpu(), "(A B) (K_h K_w) -> B A K_h K_w", **shapes
     )
-    global_rollout = einops.rearrange(
-        global_rollout.cpu().numpy(), "(A B) (K_h K_w) -> B A K_h K_w", **shapes
+    global_rollout = rearrange(
+        global_rollout.cpu(), "(A B) (K_h K_w) -> B A K_h K_w", **shapes
     )
-    obj_rollout = einops.rearrange(
-        obj_rollout.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
-    )
-    obj_rollout_full = einops.rearrange(
-        obj_rollout_full.cpu().numpy(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
-    )
+    if obj_rollout is not None:
+        obj_rollout = rearrange(
+            obj_rollout.cpu(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
+        )
+    if obj_rollout_full is not None:
+        obj_rollout_full = rearrange(
+            obj_rollout_full.cpu(), "(A B) S (K_h K_w) -> B A S K_h K_w", **shapes
+        )
     # endregion
 
     # region Compute K-means backbone
@@ -1142,9 +1168,7 @@ def run_viz(
     else:
         raise ValueError(cfg.data.name)
     vit_kmeans = kmeans_clusters(output.f_backbone, n_clusters)
-    vit_kmeans = einops.rearrange(
-        vit_kmeans, "(A B) (K_h K_w) -> B A K_h K_w", **shapes
-    )
+    vit_kmeans = rearrange(vit_kmeans, "(A B) (K_h K_w) -> B A K_h K_w", **shapes)
     vit_kmeans = plt.get_cmap(cmap)(vit_kmeans)[..., :3]  # RGB not RGBA
     # endregion
 
@@ -1170,17 +1194,22 @@ def run_viz(
             attns = vit_attns[k]
             if cfg.model.backbone.global_pool == "cls":
                 # split and re-normalize attns: [AB head 1+Q 1+K] -> [AB head Q K]
-                attns = attns[:, :, 1:, 1:]
-                attns = attns / attns.sum(dim=-1, keepdim=True)
+                attns = normalize_sum_to_one(attns[:, :, 1:, 1:])
             elif cfg.model.backbone.global_pool == "avg":
                 pass
             else:
                 raise ValueError(cfg.model.backbone.global_pool)
 
             # Single heads
-            for h in range(attns.shape[1]):
+            for h in range(cfg.model.backbone.num_heads):
                 img_vit_head = array_to_pil(
-                    attns[a * B + b, h].mean(axis=0).reshape(K_h, K_w)
+                    reduce(
+                        attns[a * B + b, h],
+                        "Q (K_h K_w) -> K_h K_w",
+                        K_h=K_h,
+                        K_w=K_w,
+                        reduction="mean",
+                    )
                 )
                 img_vit_head.save(d / f"vit.block{lyr}.head{h}.png")
                 img_vit_head = img_vit_head.resize(WH, resample=PIL.Image.NEAREST)
@@ -1188,7 +1217,14 @@ def run_viz(
 
             # Average heads
             img_vit_head = array_to_pil(
-                attns[a * B + b].mean(axis=(0, 1)).reshape(K_h, K_w), cmap="inferno"
+                reduce(
+                    attns[a * B + b],
+                    "heads Q (K_h K_w) -> K_h K_w",
+                    K_h=K_h,
+                    K_w=K_w,
+                    reduction="mean",
+                ),
+                cmap="inferno",
             )
             img_vit_head.save(d / f"vit.block{lyr}.mean.png")
             img_vit_head = img_vit_head.resize(WH, resample=PIL.Image.NEAREST)
@@ -1210,63 +1246,78 @@ def run_viz(
         img_global_rollout.save(d / "global.rollout.png")
         img_global_rollout = img_global_rollout.resize(WH, resample=PIL.Image.NEAREST)
 
-        # Slot attn backbone, one img per iteration per slot
-        imgs_slot: List[List[PIL.Image.Image]] = [
-            [img_input, img_vit_rollout],
-        ]
-        if cfg.model.obj_fn.name == "slot-attention":
-            for i, k in enumerate(obj_attns.keys()):
-                imgs_slot.append([])
-                for s in range(S):
-                    img_slot = array_to_pil(
-                        obj_attns[k][a * B + b, s].reshape(K_h, K_w)
-                    )
-                    img_slot.save(d / f"obj.slot{s}.iter{i}.png")
-                    img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
-                    imgs_slot[-1].append(img_slot)
-        elif cfg.model.obj_fn.name == "cross-attention":
-            for i, k in enumerate(
-                [k for k in obj_attns.keys() if k.endswith(".cross_attn")]
-            ):
-                imgs_slot.append([])
-                for s in range(S):
-                    img_slot = array_to_pil(
-                        obj_attns[k].mean(dim=1)[a * B + b, s].reshape(K_h, K_w)
-                    )
-                    img_slot.save(d / f"obj.cross{s}.block{i}.png")
-                    img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
-                    imgs_slot[-1].append(img_slot)
-        else:
-            raise ValueError(cfg.model.obj_fn.name)
-        imgs_slot.append([])  # for each slot, rollout of slot attn only
-        imgs_slot.append([])  # for each slot, full rollout to the input
+        # Object attention, one img per iteration/block per object
+        if cfg.model.obj_fn is not None and obj_attns is not None:
+            imgs_slot: List[List[PIL.Image.Image]] = [[img_input, img_vit_rollout]]
 
-        # Rollout of slot attention
-        imgs_summary: List[List[PIL.Image.Image]] = [
-            [img_input, img_kmeans, img_vit_rollout, img_global_rollout],
-            [],  # for each slot, rollout of slot attn only
-            [],  # for each slot, full rollout to the input
-        ]
-        for s in range(S):
-            img_slot_rollout = array_to_pil(obj_rollout[b, a, s], cmap="inferno")
-            img_slot_rollout.save(d / f"obj.slot{s}.rollout.png")
-            img_slot_rollout = img_slot_rollout.resize(WH, resample=PIL.Image.NEAREST)
-            imgs_slot[-2].append(img_slot_rollout)
-            imgs_summary[-2].append(img_slot_rollout)
+            if cfg.model.obj_fn.name == "slot-attention":
+                for i, k in enumerate(obj_attns.keys()):
+                    imgs_slot.append([])
+                    for s in range(cfg.model.obj_queries.num_objects):
+                        img_slot = array_to_pil(
+                            rearrange(
+                                obj_attns[k][a * B + b, s],
+                                "(K_h K_w) -> K_h K_w",
+                                K_h=K_h,
+                                K_w=K_w,
+                            )
+                        )
+                        img_slot.save(d / f"obj.slot{s}.iter{i}.png")
+                        img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
+                        imgs_slot[-1].append(img_slot)
+            elif cfg.model.obj_fn.name == "cross-attention":
+                for i, k in enumerate(
+                    [k for k in obj_attns.keys() if k.endswith(".cross_attn")]
+                ):
+                    imgs_slot.append([])
+                    for s in range(cfg.model.obj_queries.num_objects):
+                        img_slot = array_to_pil(
+                            reduce(
+                                obj_attns[k][a * B + b, :, s],
+                                "heads (K_h K_w) -> K_h K_w",
+                                K_h=K_h,
+                                K_w=K_w,
+                                reduction="mean",
+                            )
+                        )
+                        img_slot.save(d / f"obj.cross{s}.block{i}.png")
+                        img_slot = img_slot.resize(WH, resample=PIL.Image.NEAREST)
+                        imgs_slot[-1].append(img_slot)
+            else:
+                raise ValueError(cfg.model.obj_fn.name)
+            imgs_slot.append([])  # for each slot, rollout of slot attn only
+            imgs_slot.append([])  # for each slot, full rollout to the input
 
-            img_slot_r_full = array_to_pil(obj_rollout_full[b, a, s], cmap="inferno")
-            img_slot_r_full.save(d / f"obj.slot{s}.rollout_full.png")
-            img_slot_r_full = img_slot_r_full.resize(WH, resample=PIL.Image.NEAREST)
-            imgs_slot[-1].append(img_slot_r_full)
-            imgs_summary[-1].append(img_slot_r_full)
+            # Rollout of slot attention
+            imgs_summary: List[List[PIL.Image.Image]] = [
+                [img_input, img_kmeans, img_vit_rollout, img_global_rollout],
+                [],  # for each slot, rollout of slot attn only
+                [],  # for each slot, full rollout to the input
+            ]
+            for s in range(cfg.model.obj_queries.num_objects):
+                img_slot_rollout = array_to_pil(obj_rollout[b, a, s], cmap="inferno")
+                img_slot_rollout.save(d / f"obj.slot{s}.rollout.png")
+                img_slot_rollout = img_slot_rollout.resize(
+                    WH, resample=PIL.Image.NEAREST
+                )
+                imgs_slot[-2].append(img_slot_rollout)
+                imgs_summary[-2].append(img_slot_rollout)
 
-        imgs_slot: PIL.Image.Image = make_grid_pil(imgs_slot)
-        imgs_slot.save(d / "obj.slots.png")
-        wandb_imgs[f"obj/img{b}/aug{a}"] = imgs_slot
+                img_slot_r_full = array_to_pil(
+                    obj_rollout_full[b, a, s], cmap="inferno"
+                )
+                img_slot_r_full.save(d / f"obj.slot{s}.rollout_full.png")
+                img_slot_r_full = img_slot_r_full.resize(WH, resample=PIL.Image.NEAREST)
+                imgs_slot[-1].append(img_slot_r_full)
+                imgs_summary[-1].append(img_slot_r_full)
 
-        imgs_summary: PIL.Image.Image = make_grid_pil(imgs_summary)
-        imgs_summary.save(d / "summary.png")
-        wandb_imgs[f"summary/img{b}/aug{a}"] = imgs_summary
+            imgs_slot: PIL.Image.Image = make_grid_pil(imgs_slot)
+            imgs_slot.save(d / "obj.slots.png")
+            wandb_imgs[f"obj/img{b}/aug{a}"] = imgs_slot
+
+            imgs_summary: PIL.Image.Image = make_grid_pil(imgs_summary)
+            imgs_summary.save(d / "summary.png")
+            wandb_imgs[f"summary/img{b}/aug{a}"] = imgs_summary
     # endregion
 
     wandb.log(
@@ -1284,6 +1335,10 @@ def run_test_segmentation(
     model: Model,
     step_counter: StepCounter,
 ):
+    # Skip segmentation if the models doesn't contain object attention
+    if cfg.model.obj_fn is None:
+        return
+
     model.eval()
     num_patches = np.array(cfg.data.crop_size) // np.array(
         cfg.model.backbone.patch_size
@@ -1315,13 +1370,11 @@ def run_test_segmentation(
         elif cfg.model.obj_fn.name == "cross-attention":
             # TODO: check if this works well for segmentation
             obj_rollout = attns["obj_fn.attn_blocks.0.cross_attn"]
-            obj_rollout = einops.reduce(
-                obj_rollout, "B heads S K -> B S K", reduction="mean"
-            )
+            obj_rollout = reduce(obj_rollout, "B heads S K -> B S K", reduction="mean")
         else:
             raise ValueError(cfg.model.obj_fn.name)
         obj_rollout = torch.nn.functional.interpolate(
-            einops.rearrange(
+            rearrange(
                 obj_rollout,
                 "B S (K_h K_w) -> B S K_h K_w",
                 K_h=num_patches[0],

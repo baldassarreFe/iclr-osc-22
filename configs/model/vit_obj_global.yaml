@@ -1,5 +1,8 @@
 defaults:
   - common
+  - obj_queries: learned
+  - obj_fn: slot_attention
+  - obj_proj: mlp
   - _self_
 
 architecture: 'backbone-obj_fn(-global_fn-global_proj)-obj_proj'

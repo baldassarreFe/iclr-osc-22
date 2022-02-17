@@ -1,0 +1,4 @@
+# Enable with: train.py model/obj_queries/learned
+
+name: "learned"
+num_objects: 11 # S
