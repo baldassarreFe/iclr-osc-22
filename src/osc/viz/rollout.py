@@ -1,13 +1,15 @@
 from typing import Callable, Mapping, Sequence, Union
 
-import einops
 import torch
+from einops import reduce
+from einops.layers.torch import Reduce
+from torch import Tensor
 
 from osc.utils import fill_diagonal_, normalize_sum_to_one
 
 
 def self_attn_rollout(
-    attns: Union[Mapping[str, torch.Tensor], Sequence[torch.Tensor]],
+    attns: Union[Mapping[str, Tensor], Sequence[Tensor]],
     head_reduction: Union[str, Callable] = "mean",
     adjust_residual=True,
     global_avg_pool=True,
@@ -31,7 +33,7 @@ def self_attn_rollout(
 
     # Reduce heads: mean or max
     if head_reduction in {"mean", "max"}:
-        head_reduction = einops.layers.torch.Reduce("B h Q K -> B Q K", head_reduction)
+        head_reduction = Reduce("B h Q K -> B Q K", head_reduction)
     attns = [head_reduction(a) for a in attns]
 
     # adjust for self-connections
@@ -45,7 +47,7 @@ def self_attn_rollout(
     # Last layer is global avg pool, i.e. a single query token
     # that attends to all keys with uniform attention
     if global_avg_pool:
-        rollout = einops.reduce(rollout, "B Q K -> B K", "mean")
+        rollout = reduce(rollout, "B Q K -> B K", "mean")
 
     return rollout
 

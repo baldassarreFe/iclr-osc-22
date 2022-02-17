@@ -3,9 +3,9 @@ Attention visualization utils: single attn maps and rollouts.
 """
 from itertools import product
 
-import einops
 import numpy as np
 import torch
+from einops import rearrange, reduce
 from IPython.core.display import Image
 from IPython.core.display_functions import display
 from matplotlib import pyplot as plt
@@ -16,13 +16,11 @@ from .rollout import self_attn_rollout, slot_attn_rollout
 def viz_vit_attns(images, attns_dict, head_reduction="mean", adjust_residual=True):
     A, B = images.shape[:2]
     images = images.detach().cpu().numpy()
-    images = einops.rearrange(images, "A B C H W -> B A H W C")
+    images = rearrange(images, "A B C H W -> B A H W C")
 
     L = len(attns_dict)
     attns = [attns_dict[k].detach() for k in sorted(attns_dict.keys())]
-    attns = einops.rearrange(
-        attns, "L (A B) h Q_hw K_hw -> B A L h Q_hw K_hw", A=A, B=B
-    )
+    attns = rearrange(attns, "L (A B) h Q_hw K_hw -> B A L h Q_hw K_hw", A=A, B=B)
     num_heads = attns.shape[3]
     K_h = K_w = int(np.sqrt(attns.shape[5]))
 
@@ -32,12 +30,12 @@ def viz_vit_attns(images, attns_dict, head_reduction="mean", adjust_residual=Tru
     # - rearrange keys into a square image
     attns = torch.concat(
         [
-            einops.reduce(attns, "B A L h Q_hw K_hw -> B A L 1 K_hw", "sum"),
-            einops.reduce(attns, "B A L h Q_hw K_hw -> B A L h K_hw", "sum"),
+            reduce(attns, "B A L h Q_hw K_hw -> B A L 1 K_hw", "sum"),
+            reduce(attns, "B A L h Q_hw K_hw -> B A L h K_hw", "sum"),
         ],
         dim=3,
     )
-    attns = einops.rearrange(
+    attns = rearrange(
         attns.cpu().numpy(), "B A L h (K_h K_w) -> B A L h K_h K_w", K_h=K_h, K_w=K_w
     )
 
@@ -48,7 +46,7 @@ def viz_vit_attns(images, attns_dict, head_reduction="mean", adjust_residual=Tru
         adjust_residual=adjust_residual,
         global_avg_pool=True,
     )
-    rollout = einops.rearrange(
+    rollout = rearrange(
         rollout.cpu().numpy(),
         "(A B) (K_h K_w) -> B A K_h K_w",
         A=A,
@@ -124,10 +122,10 @@ def viz_slot_attns(
     num_augs = images.shape[0]
     batch_size = images.shape[1]
     images = images.detach().cpu().numpy()
-    images = einops.rearrange(images, "A B C H W -> B A H W C")
+    images = rearrange(images, "A B C H W -> B A H W C")
 
     attns = [slot_attns_dict[i].detach() for i in sorted(slot_attns_dict.keys())]
-    attns = einops.rearrange(
+    attns = rearrange(
         attns,
         "I (A B) k K_hw -> B A I k K_hw",
         A=num_augs,
@@ -139,7 +137,7 @@ def viz_slot_attns(
     num_slots = attns.shape[3]
 
     K_h = K_w = int(np.sqrt(attns.shape[-1]))
-    attns = einops.rearrange(
+    attns = rearrange(
         attns,
         "B A I k (K_h K_w) -> B A I k K_h K_w",
         K_h=K_h,
@@ -159,7 +157,7 @@ def viz_slot_attns(
     # [A*B, K, K_hw]
     full_rollouts = torch.einsum("bki,bij->bkj", slot_rollouts, vit_rollout)
 
-    slot_rollouts = einops.rearrange(
+    slot_rollouts = rearrange(
         slot_rollouts.cpu().numpy(),
         "(A B) k (K_h K_w) -> B A k K_h K_w",
         A=num_augs,
@@ -167,7 +165,7 @@ def viz_slot_attns(
         K_h=K_h,
         K_w=K_w,
     )
-    full_rollouts = einops.rearrange(
+    full_rollouts = rearrange(
         full_rollouts.cpu().numpy(),
         "(A B) k (K_h K_w) -> B A k K_h K_w",
         A=num_augs,
@@ -246,12 +244,12 @@ def viz_vit_rollout_all_options(images, attns_dict):
     """Visualize backbone rollout: residual adjustment, head reduction"""
     A, B = images.shape[:2]
     images = images.detach().cpu().numpy()
-    images = einops.rearrange(images, "A B C H W -> B A H W C")
+    images = rearrange(images, "A B C H W -> B A H W C")
 
     K_h = K_w = int(np.sqrt(list(attns_dict.values())[0].shape[-1]))
 
     fig, axs = plt.subplots(B * A, 1 + 4, figsize=2.5 * (np.array([1 + 4, B * A])))
-    axs = einops.rearrange(axs, "(B A) L -> B A L", B=B, A=A)
+    axs = rearrange(axs, "(B A) L -> B A L", B=B, A=A)
 
     for b, a in np.ndindex(B, A):
         axs[b, a, 0].imshow(images[b, a])
@@ -266,7 +264,7 @@ def viz_vit_rollout_all_options(images, attns_dict):
             adjust_residual=adjust_residual,
             global_avg_pool=True,
         )
-        rollout = einops.rearrange(
+        rollout = rearrange(
             rollout.cpu().numpy(),
             "(A B) (K_h K_w) -> B A K_h K_w",
             A=A,
@@ -292,7 +290,7 @@ def viz_slot_rollout_all_options(images, slot_attns_dict, vit_rollout):
     """Visualize slot attention rollout: per-iteration or final normalization."""
     A, B = images.shape[:2]
     images = images.detach().cpu().numpy()
-    images = einops.rearrange(images, "A B C H W -> B A H W C")
+    images = rearrange(images, "A B C H W -> B A H W C")
 
     K_h = K_w = int(np.sqrt(list(slot_attns_dict.values())[0].shape[-1]))
     S = list(slot_attns_dict.values())[0].shape[-2]
@@ -300,7 +298,7 @@ def viz_slot_rollout_all_options(images, slot_attns_dict, vit_rollout):
     fig, axs = plt.subplots(
         B * A * 4, 1 + S, figsize=2 * (np.array([1 + S, B * A * 4]))
     )
-    axs = einops.rearrange(axs, "(B A opt) Sp -> B A opt Sp", B=B, A=A, opt=4)
+    axs = rearrange(axs, "(B A opt) Sp -> B A opt Sp", B=B, A=A, opt=4)
 
     for b, a in np.ndindex(B, A):
         axs[b, a, 0, 0].imshow(images[b, a])
@@ -309,7 +307,7 @@ def viz_slot_rollout_all_options(images, slot_attns_dict, vit_rollout):
         slot_rollout = slot_attn_rollout(slot_attns_dict, normalize=normalize)
         if full:
             slot_rollout = torch.einsum("bsj,bjk->bsk", slot_rollout, vit_rollout)
-        slot_rollout = einops.rearrange(
+        slot_rollout = rearrange(
             slot_rollout.cpu().numpy(),
             "(A B) S (K_h K_w) -> B A S K_h K_w",
             A=A,

@@ -14,6 +14,7 @@ import numpy as np
 import tabulate
 import tensorflow as tf
 import torch
+from torch import Tensor
 
 log = logging.getLogger(__name__)
 
@@ -24,9 +25,9 @@ ImgStd = Tuple[float, float, float]
 
 def print_arrays(
     x: Union[
-        Union[str, np.ndarray, torch.Tensor],
-        Sequence[Union[str, np.ndarray, torch.Tensor]],
-        Mapping[str, Union[np.ndarray, torch.Tensor]],
+        Union[str, np.ndarray, Tensor],
+        Sequence[Union[str, np.ndarray, Tensor]],
+        Mapping[str, Union[np.ndarray, Tensor]],
     ]
 ):
     """Print array/tensor info (name, shape, dtype).
@@ -43,12 +44,12 @@ def print_arrays(
     """
     orig_type = type(x)
 
-    if isinstance(x, (str, np.ndarray, torch.Tensor)):
+    if isinstance(x, (str, np.ndarray, Tensor)):
         x = [x]
 
     if isinstance(x, Sequence):
         if len(x) > 0:
-            if isinstance(x[0], (np.ndarray, torch.Tensor)):
+            if isinstance(x[0], (np.ndarray, Tensor)):
                 x = dict(enumerate(x))
             elif isinstance(x[0], str):
                 locs = inspect.currentframe().f_back.f_locals
@@ -70,7 +71,7 @@ def print_arrays(
 
 
 @torch.jit.script
-def l2_normalize_(a: torch.Tensor) -> torch.Tensor:
+def l2_normalize_(a: Tensor) -> Tensor:
     """L2 normalization in-place along the last dimension.
 
     Args:
@@ -84,7 +85,7 @@ def l2_normalize_(a: torch.Tensor) -> torch.Tensor:
 
 
 @torch.jit.script
-def l2_normalize(a: torch.Tensor) -> torch.Tensor:
+def l2_normalize(a: Tensor) -> Tensor:
     """L2 normalization along the last dimension.
 
     Args:
@@ -98,7 +99,7 @@ def l2_normalize(a: torch.Tensor) -> torch.Tensor:
 
 
 @torch.jit.script
-def cos_pairwise(a: torch.Tensor, b: Optional[torch.Tensor] = None) -> torch.Tensor:
+def cos_pairwise(a: Tensor, b: Optional[Tensor] = None) -> Tensor:
     """Cosine between all pairs of entries in two tensors.
 
     Args:
@@ -160,12 +161,12 @@ def latest_checkpoint(run_dir: Union[Path, str]) -> Path:
 
 
 @torch.jit.script
-def normalize_sum_to_one(tensor: torch.Tensor, dim: int = -1) -> torch.Tensor:
+def normalize_sum_to_one(tensor: Tensor, dim: int = -1) -> Tensor:
     """Normalize tensor so that it sums to one over the last dimension."""
     return tensor / tensor.sum(dim=dim, keepdim=True).clamp_min(1e-8)
 
 
-def fill_diagonal_(x: torch.Tensor, value: float = -torch.inf) -> torch.Tensor:
+def fill_diagonal_(x: Tensor, value: float = -torch.inf) -> Tensor:
     """Fill diagonal of torch tensor, batched and in-place.
 
     Args:
@@ -250,7 +251,7 @@ class AverageMetric(object):
         self.total = 0.0
         self.count = 0
 
-    def update(self, values: torch.Tensor):
+    def update(self, values: Tensor):
         """Update.
 
         Args:

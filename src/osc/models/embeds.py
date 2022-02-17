@@ -5,6 +5,7 @@ Positional embeddings and query tokens for objects.
 import numpy as np
 import timm.models
 import torch
+from torch import Tensor
 from torch import nn as nn
 
 from osc.utils import l2_normalize
@@ -92,7 +93,7 @@ class KmeansCosineObjectTokens(nn.Module):
         self.tol = 1e-6
         self.num_objects = num_objects
 
-    def forward(self, x: torch.Tensor, num_objects: int = None, seed=None):
+    def forward(self, x: Tensor, num_objects: int = None, seed=None):
         """K-means clustering to initialize object tokens.
 
         Args:
@@ -116,7 +117,7 @@ class KmeansEuclideanObjectTokens(nn.Module):
         self.tol = 1e-6
         self.num_objects = num_objects
 
-    def forward(self, x: torch.Tensor, num_objects: int = None, seed=None):
+    def forward(self, x: Tensor, num_objects: int = None, seed=None):
         """K-means clustering to initialize object tokens.
 
         Args:
@@ -134,7 +135,7 @@ class KmeansEuclideanObjectTokens(nn.Module):
 
 @torch.no_grad()
 def torch_kmeans_euclidean(
-    x: torch.Tensor, num_clusters: int, seed: int = None, max_iters=10, tol=1e-8
+    x: Tensor, num_clusters: int, seed: int = None, max_iters=10, tol=1e-8
 ):
     """Batched k-means for PyTorch with Euclidean distance.
 
@@ -193,7 +194,7 @@ def torch_kmeans_euclidean(
 
 @torch.no_grad()
 def torch_kmeans_cosine(
-    x: torch.Tensor, num_clusters: int, seed: int = None, max_iters=10, tol=1e-8
+    x: Tensor, num_clusters: int, seed: int = None, max_iters=10, tol=1e-8
 ):
     """Batched k-means for PyTorch with cosine distance.
 

@@ -3,16 +3,17 @@ from typing import Tuple
 import numpy as np
 import scipy.optimize
 import torch
+from torch import Tensor
 from torch.nn.functional import cross_entropy
 
 from osc.utils import cos_pairwise, l2_normalize
 
 
 def matching_contrastive_loss(
-    slots: torch.Tensor,
+    slots: Tensor,
     temperature: float = 1.0,
     reduction: str = "mean",
-) -> torch.Tensor:
+) -> Tensor:
     """Contrastive object-wise loss, all vs. all.
 
     The vectors in position ``i`` and ``i + B`` of `projs` must represent ``K``
@@ -137,8 +138,8 @@ def matching_contrastive_loss_best_worst(
 
 
 def matching_contrastive_loss_per_img(
-    slots: torch.Tensor, temperature: float = 1.0, reduction: str = "mean"
-) -> torch.Tensor:
+    slots: Tensor, temperature: float = 1.0, reduction: str = "mean"
+) -> Tensor:
     """Contrastive object-wise loss, only between corresponding images.
 
     The ``K`` slots of the ``i``-th image are matched with the slots of the ``i+B``-th

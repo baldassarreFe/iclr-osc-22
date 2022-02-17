@@ -3,14 +3,13 @@ from typing import Tuple
 import numpy as np
 import torch
 import torch.nn.functional
+from torch import Tensor
 
 from osc.utils import cos_pairwise, l2_normalize
 
 
 @torch.jit.script
-def cosine_sim_loss(
-    feats: torch.Tensor, projs: torch.Tensor, reduction: str = "mean"
-) -> torch.Tensor:
+def cosine_sim_loss(feats: Tensor, projs: Tensor, reduction: str = "mean") -> Tensor:
     """Cosine similarity loss for BYOL and SimSiam.
 
     For both `feats` and `projs`, the vectors in position ``i`` and ``i + B``
@@ -68,8 +67,8 @@ def cosine_sim_loss(
 
 @torch.jit.script
 def contrastive_loss(
-    projs: torch.Tensor, temperature: float = 1.0, reduction: str = "mean"
-) -> torch.Tensor:
+    projs: Tensor, temperature: float = 1.0, reduction: str = "mean"
+) -> Tensor:
     """Contrastive loss for SimCLR.
 
     The vectors in position ``i`` and ``i + B`` of `projs` must

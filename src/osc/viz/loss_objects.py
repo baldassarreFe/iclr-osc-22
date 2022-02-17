@@ -8,13 +8,14 @@ from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from torch import Tensor
 
 from osc.utils import cos_pairwise
 
 from .utils import subplots_grid
 
 
-def match_objects(obj_feats: torch.Tensor) -> np.ndarray:
+def match_objects(obj_feats: Tensor) -> np.ndarray:
     """Compute matches between 2B images with S objects each.
 
     Args:
@@ -37,7 +38,7 @@ def match_objects(obj_feats: torch.Tensor) -> np.ndarray:
     return targets
 
 
-def viz_contrastive_loss_objects(obj_feats: torch.Tensor, loss: float) -> Figure:
+def viz_contrastive_loss_objects(obj_feats: Tensor, loss: float) -> Figure:
     """Visualize contrastive loss between 2B images with S objects each.
 
     Args:
@@ -112,7 +113,7 @@ def viz_contrastive_loss_objects(obj_feats: torch.Tensor, loss: float) -> Figure
 
 
 def viz_contrastive_loss_objects_probs(
-    obj_feats: torch.Tensor, temp: float, loss: float
+    obj_feats: Tensor, temp: float, loss: float
 ) -> Figure:
     """Visualize contrastive loss between 2B images with S objects each, probabilities only.
 

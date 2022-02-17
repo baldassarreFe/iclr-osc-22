@@ -1,5 +1,8 @@
+from typing import Tuple
+
 import timm.models
 import torch
+from torch import Tensor
 from torch import nn as nn
 
 from osc.models.attentions import SelfAttentionBlock
@@ -73,15 +76,15 @@ class ViTBackbone(nn.Module):
             timm.models.layers.trunc_normal_(self.cls_token, std=0.02)
         self.apply(timm.models.vision_transformer._init_vit_weights)
 
-    def forward(self, images: torch.Tensor):
-        """
+    def forward(self, images: Tensor) -> Tuple[Tensor, Tensor]:
+        """Forward.
 
         Args:
             images: tensor of shape ``[B 3 H W]``
 
         Returns:
-            Global features of shape ``[B C]``.
-            Patch features of shape``[B N C]``, where ``N = HW // patch_area``.
+            A tuple of global and patch features. Global features have shape ``[B C]``.
+            Patch features have shape``[B N C]``, where ``N = HW // patch_area``.
             The output is not L2 normalized.
         """
         B = images.shape[0]

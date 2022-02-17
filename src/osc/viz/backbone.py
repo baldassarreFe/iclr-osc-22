@@ -3,13 +3,14 @@ Clustering backbone features.
 """
 from typing import Tuple, Union
 
-import einops
 import numpy as np
 import torch
+from einops import rearrange
 from IPython.core.display import Image
 from IPython.core.display_functions import display
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
+from torch import Tensor
 
 
 def kmeans_backbone(images, f_backbone, num_patches: Tuple[int, int]):
@@ -17,13 +18,13 @@ def kmeans_backbone(images, f_backbone, num_patches: Tuple[int, int]):
     num_augs = images.shape[0]
     batch_size = images.shape[1]
 
-    f_backbone = einops.rearrange(
+    f_backbone = rearrange(
         f_backbone.detach().cpu().numpy(),
         "(A B) P_hw C -> B (A P_hw) C",
         A=num_augs,
         B=batch_size,
     )
-    images = einops.rearrange(
+    images = rearrange(
         images.detach().cpu().numpy(),
         "A B C H W -> B A H W C",
     )
@@ -51,9 +52,7 @@ def kmeans_backbone(images, f_backbone, num_patches: Tuple[int, int]):
         display(Image(url=f"img-{b}-vit-kmeans.png", width=600))
 
 
-def kmeans_clusters(
-    x: Union[torch.Tensor, np.ndarray], n_clusters: int = 11
-) -> np.ndarray:
+def kmeans_clusters(x: Union[Tensor, np.ndarray], n_clusters: int = 11) -> np.ndarray:
     """Batched K-means clustering.
 
     Args:

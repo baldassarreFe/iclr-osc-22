@@ -14,10 +14,11 @@ from matplotlib.axis import Axis
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 from PIL import Image as PilImage
+from torch import Tensor
 
 
 def array_to_pil(
-    img: Union[np.ndarray, torch.Tensor], cmap: str = None, scale_range=True
+    img: Union[np.ndarray, Tensor], cmap: str = None, scale_range=True
 ) -> PilImage.Image:
     """Array or tensor to PIL image. Works for both grayscale and RGB images.
 
@@ -138,6 +139,6 @@ def batched_otsu(x: np.ndarray) -> np.ndarray:
     return result
 
 
-def batched_otsu_pt(x: torch.Tensor) -> torch.Tensor:
+def batched_otsu_pt(x: Tensor) -> Tensor:
     """Same as :func:``batched_otsu`` but with torch tensors."""
     return torch.from_numpy(batched_otsu(x.cpu().numpy())).to(x.device)

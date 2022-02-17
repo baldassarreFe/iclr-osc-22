@@ -27,6 +27,7 @@ import wandb.util
 from einops import rearrange, reduce
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
+from torch import Tensor
 
 import osc.data.clevr_with_masks
 from osc.data.tfrecords import deserialize_image
@@ -378,7 +379,7 @@ class ModelLoss(Protocol):
 
     def __call__(
         self, output: ModelOutput, *, reduction: str = "mean"
-    ) -> Optional[torch.Tensor]:
+    ) -> Optional[Tensor]:
         ...
 
 
@@ -391,14 +392,14 @@ def build_loss_fn_global(cfg: DictConfig) -> ModelLoss:
 
     elif cfg.losses.l_global.name == "sim":
 
-        def loss_fn_global(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
+        def loss_fn_global(output: ModelOutput, *, reduction="mean") -> Tensor:
             return cosine_sim_loss(
                 output.f_global, output.p_global, reduction=reduction
             )
 
     elif cfg.losses.l_global.name == "ctr":
 
-        def loss_fn_global(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
+        def loss_fn_global(output: ModelOutput, *, reduction="mean") -> Tensor:
             return contrastive_loss(
                 output.p_global,
                 temperature=cfg.losses.l_global.temp,
@@ -425,7 +426,7 @@ def build_loss_fn_objects(cfg: DictConfig) -> ModelLoss:
 
     elif cfg.losses.l_objects.name == "ctr_img":
 
-        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> Tensor:
             return matching_contrastive_loss_per_img(
                 output.p_slots,
                 temperature=cfg.losses.l_objects.temp,
@@ -434,7 +435,7 @@ def build_loss_fn_objects(cfg: DictConfig) -> ModelLoss:
 
     elif cfg.losses.l_objects.name == "ctr_all":
 
-        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> torch.Tensor:
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> Tensor:
             return matching_contrastive_loss(
                 output.p_slots,
                 temperature=cfg.losses.l_objects.temp,

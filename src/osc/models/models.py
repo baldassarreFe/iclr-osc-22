@@ -5,8 +5,8 @@ Model definitions and wrappers to get attention maps.
 from contextlib import contextmanager
 from typing import Dict, Generator, List, NamedTuple, Optional
 
-import torch
 import torch.nn as nn
+from torch import Tensor
 from torch.utils.hooks import RemovableHandle
 
 from osc.models.attentions import CrossAttention, SelfAttention
@@ -33,11 +33,11 @@ class ModelOutput(NamedTuple):
 
     """
 
-    f_backbone: torch.Tensor
-    f_global: torch.Tensor
-    f_slots: Optional[torch.Tensor]
-    p_global: torch.Tensor
-    p_slots: Optional[torch.Tensor]
+    f_backbone: Tensor
+    f_global: Tensor
+    f_slots: Optional[Tensor]
+    p_global: Tensor
+    p_slots: Optional[Tensor]
 
 
 class Model(nn.Module):
@@ -80,7 +80,7 @@ class Model(nn.Module):
         self.obj_fn = obj_fn
         self.obj_proj = obj_proj
 
-    def forward(self, images: torch.Tensor) -> ModelOutput:
+    def forward(self, images: Tensor) -> ModelOutput:
         """Forward.
 
         Args:
@@ -147,7 +147,7 @@ class Model(nn.Module):
 
 
 @contextmanager
-def forward_with_attns(model: Model) -> Generator[Dict[str, torch.Tensor], None, None]:
+def forward_with_attns(model: Model) -> Generator[Dict[str, Tensor], None, None]:
     """Context manager to set and remove hooks that collect attention maps.
 
     Example:
@@ -166,7 +166,7 @@ def forward_with_attns(model: Model) -> Generator[Dict[str, torch.Tensor], None,
     module_to_name: Dict[nn.Module, str] = {
         # nn.Module: name
     }
-    attns: Dict[str, torch.Tensor] = {
+    attns: Dict[str, Tensor] = {
         # backbone.attn_blocks.*:          [AB heads Q K]
         # obj_fn.slot_attn.*:              [AB       S K]
         # obj_fn.attn_blocks.*.self_attn:  [AB heads S S]

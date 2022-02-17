@@ -7,13 +7,14 @@ from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from torch import Tensor
 
 from osc.utils import cos_pairwise
 
 from .utils import subplots_grid
 
 
-def viz_contrastive_loss_global(global_feats: torch.Tensor, loss: float) -> Figure:
+def viz_contrastive_loss_global(global_feats: Tensor, loss: float) -> Figure:
     """Visualize global contrastive loss between 2B images.
 
     Args:
@@ -77,7 +78,7 @@ def viz_contrastive_loss_global(global_feats: torch.Tensor, loss: float) -> Figu
 
 
 def viz_contrastive_loss_global_probs(
-    global_feats: torch.Tensor, temp: float, loss: float
+    global_feats: Tensor, temp: float, loss: float
 ) -> Figure:
     """Visualize global contrastive loss between 2B images, probabilities only.
 

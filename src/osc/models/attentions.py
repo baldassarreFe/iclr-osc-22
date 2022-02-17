@@ -15,7 +15,7 @@ import timm.models.vision_transformer
 import torch
 from einops.layers.torch import Rearrange
 from timm.models.layers import DropPath, Mlp
-from torch import nn
+from torch import Tensor, nn
 
 
 class SelfAttention(nn.Module):
@@ -67,7 +67,7 @@ class SelfAttention(nn.Module):
             nn.Dropout(proj_drop),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         """Forward.
 
         Args:
@@ -146,7 +146,7 @@ class CrossAttention(nn.Module):
             nn.Dropout(proj_drop),
         )
 
-    def forward(self, x: torch.Tensor, ctx: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor, ctx: Tensor) -> Tensor:
         """Forward.
 
         Args:
@@ -235,7 +235,7 @@ class SlotAttention(nn.Module):
         self.norm_slots = nn.LayerNorm(dim)
         self.norm_pre_ff = nn.LayerNorm(dim)
 
-    def forward(self, slots: torch.Tensor, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self, slots: Tensor, inputs: Tensor) -> Tensor:
         """Forward.
 
         Args:
@@ -347,7 +347,7 @@ class SelfAttentionBlock(nn.Module):
             drop=drop,
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         """Forward.
 
         Args:
@@ -453,7 +453,7 @@ class CrossAttentionBlock(nn.Module):
             drop=drop,
         )
 
-    def forward(self, x: torch.Tensor, ctx: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor, ctx: Tensor) -> Tensor:
         """Forward.
 
         Args:
@@ -487,9 +487,7 @@ class CoAttentionBlock(nn.Module):
         self.cross_a_b = CrossAttentionBlock(*args, **kwargs)
         self.cross_b_a = CrossAttentionBlock(*args, **kwargs)
 
-    def forward(
-        self, a: torch.Tensor, b: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, a: Tensor, b: Tensor) -> Tuple[Tensor, Tensor]:
         """Forward.
 
         Args:
@@ -563,7 +561,7 @@ class CrossAttentionDecoder(nn.Module):
         # noinspection PyProtectedMember
         self.apply(timm.models.vision_transformer._init_vit_weights)
 
-    def forward(self, obj_queries: torch.Tensor, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self, obj_queries: Tensor, inputs: Tensor) -> Tensor:
         """Forward.
 
         Args:
