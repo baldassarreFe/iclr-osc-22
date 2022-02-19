@@ -1395,7 +1395,6 @@ def run_test_segmentation(
 
         ious.extend(iou_val[b, visibility[b]] for b in range(B))
         dices.extend(dice_val[b, visibility[b]] for b in range(B))
-        epoch_bar.update(B)
 
         # TODO: handle case where number of GT masks T != number of slots S
 
@@ -1405,8 +1404,8 @@ def run_test_segmentation(
         # - thresholded attn maps per slot (ordered to match ground-truth)
         # - overlay of img and thresholded attn maps per slot (ordered to match GT)
         # - ground-truth masks and per-slot IoU
-        wandb_imgs = {}
         if batch_idx == 0:
+            wandb_imgs = {}
             d = Path(f"epoch{epoch}/test")
             d.mkdir(exist_ok=True, parents=True)
 
@@ -1457,11 +1456,13 @@ def run_test_segmentation(
                 fig.savefig(d / f"img{b}.iou.png")
                 wandb_imgs[f"test/iou/img{b}"] = fig
                 plt.close(fig)
-        wandb.log(
-            {k: wandb.Image(v) for k, v in wandb_imgs.items()},
-            step=int(step_counter),
-            commit=False,
-        )
+            wandb.log(
+                {k: wandb.Image(v) for k, v in wandb_imgs.items()},
+                step=int(step_counter),
+                commit=False,
+            )
+
+        epoch_bar.update(B)
 
     epoch_bar.close()
     wandb.log(
