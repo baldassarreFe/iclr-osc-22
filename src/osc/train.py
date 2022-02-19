@@ -3,9 +3,11 @@ Main training methods.
 """
 
 import logging
+import os
 import random
 import time
 from collections import defaultdict
+from contextlib import suppress
 from functools import partial
 from itertools import islice
 from pathlib import Path
@@ -17,6 +19,7 @@ import namesgenerator
 import numpy as np
 import omegaconf
 import PIL.Image
+import submitit
 import tabulate
 import tensorflow as tf
 import torch
@@ -75,8 +78,9 @@ def main(cfg: DictConfig) -> None:
     with open("train.yaml", "w") as f:
         f.write(OmegaConf.to_yaml(cfg, resolve=True))
 
-    seed_everything(cfg.other.seed)
     setup_wandb(cfg)
+    seed_everything(cfg.other.seed)
+    log_env_info()
 
     ds_train = build_dataset_train(cfg)
     ds_val = build_dataset_val(cfg)
@@ -180,6 +184,23 @@ def update_cfg(cfg: DictConfig, readonly=True):
     OmegaConf.set_struct(result, True)
     OmegaConf.set_readonly(result, readonly)
     return result
+
+
+def log_env_info():
+    log.info("PID: %d", os.getpid())
+
+    conda = [f"{k}={v}" for k, v in os.environ.items() if k.startswith("CONDA_")]
+    if len(conda) > 0:
+        log.info("Conda:\n%s", "\n".join(conda))
+
+    slurm = [f"{k}={v}" for k, v in os.environ.items() if k.startswith("SLURM_")]
+    if len(slurm) > 0:
+        log.info("Slurm:\n%s", "\n".join(slurm))
+
+    # Ignore errors when running a single run locally
+    with suppress(RuntimeError):
+        env = submitit.JobEnvironment()
+        log.info("Submitit env:\n%s", env)
 
 
 def build_model(cfg: DictConfig) -> Model:
@@ -807,6 +828,7 @@ def run_train_val_viz_epochs(
                     f"./checkpoint.{epoch}.pth",
                 )
 
+            log.info("Done epoch %d", epoch)
             if should_stop:
                 break
     log.info("Done training for %d/%d epochs", epoch + 1, cfg.training.num_epochs)
