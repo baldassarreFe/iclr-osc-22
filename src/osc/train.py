@@ -28,6 +28,7 @@ from einops import rearrange, reduce
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
 from torch import Tensor
+from torchvision.transforms.functional import to_pil_image
 
 import osc.data.clevr_with_masks
 from osc.data.tfrecords import deserialize_image
@@ -62,7 +63,7 @@ from osc.viz.loss_global import viz_contrastive_loss_global_probs
 from osc.viz.loss_objects import viz_contrastive_loss_objects_probs
 from osc.viz.rollout import cross_attn_rollout, self_attn_rollout, slot_attn_rollout
 from osc.viz.segmentation import match_segmentation_masks
-from osc.viz.utils import array_to_pil, batched_otsu_pt, make_grid_pil
+from osc.viz.utils import array_to_pil, batched_otsu_pt, make_grid_pil, subplots_grid
 from osc.wandb_utils import setup_wandb
 
 log = logging.getLogger(__name__)
@@ -257,6 +258,7 @@ def build_model(cfg: DictConfig) -> Model:
         obj_queries = SampledObjectTokens(
             embed_dim=cfg.model.backbone.embed_dim,
             num_objects=cfg.model.obj_queries.num_objects,
+            num_components=cfg.model.obj_queries.num_components,
         )
     elif cfg.model.obj_queries.name == "learned":
         obj_queries = LearnedObjectTokens(
@@ -656,6 +658,7 @@ def build_dataset_test(cfg: DictConfig) -> tf.data.Dataset:
 
     # Other stuff
     ds = ds.batch(cfg.training.batch_size, drop_remainder=False)
+    ds = ds.enumerate()
     ds = ds.prefetch(tf.data.AUTOTUNE)
 
     log.info(
@@ -1010,15 +1013,12 @@ def run_viz(
     """
 
     # region Prepare input images, save if it's the first epoch
-    images = torch.from_numpy(np.copy(viz_batch)).to(cfg.other.device)
-    images_np = (
-        rearrange(
-            unnormalize_pt(images, cfg.data.normalize.mean, cfg.data.normalize.std),
-            "A B C H W -> B A H W C",
-        )
-        .cpu()
-        .numpy()
-    )
+    images = torch.from_numpy(np.copy(viz_batch))
+    images_np = rearrange(
+        unnormalize_pt(images, cfg.data.normalize.mean, cfg.data.normalize.std),
+        "A B C H W -> B A H W C",
+    ).numpy()
+    images = images.to(cfg.other.device)
     if epoch == 0:
         array_to_pil(rearrange(images_np, "B A H W C -> (A H) (B W) C")).save(
             "viz_batch.png"
@@ -1357,14 +1357,14 @@ def run_test_segmentation(
             "{elapsed}<{remaining}, {rate_fmt}{postfix}"
         ),
     )
-    for examples in ds_test.as_numpy_iterator():
-        B = examples["image"].shape[0]
-
-        images = torch.from_numpy(np.copy(examples["image"])).to(cfg.other.device)
-        masks = torch.from_numpy(np.copy(examples["mask"])).to(cfg.other.device)
+    for batch_idx, examples in ds_test.as_numpy_iterator():
+        B, T = examples["visibility"].shape
+        images = torch.from_numpy(np.copy(examples["image"]))
+        masks = torch.from_numpy(np.copy(examples["mask"]))
+        visibility = examples["visibility"]
 
         with forward_with_attns(model) as attns:
-            _ = model(images)
+            _ = model(images.to(cfg.other.device))
 
         if cfg.model.obj_fn.name == "slot-attention":
             obj_rollout = attns["obj_fn.slot_attn.0"]
@@ -1385,18 +1385,83 @@ def run_test_segmentation(
             mode="nearest",
         )
         obj_rollout_thres = batched_otsu_pt(obj_rollout)
-        _, iou_val, _, dice_val = match_segmentation_masks(
-            masks, obj_rollout, obj_rollout_thres
+        iou_idx, iou_val, _, dice_val = match_segmentation_masks(
+            masks=masks.to(cfg.other.device),
+            preds=obj_rollout,
+            preds_thres=obj_rollout_thres,
         )
         iou_val = iou_val.cpu().numpy()
         dice_val = dice_val.cpu().numpy()
 
-        # TODO: if first batch, save figure with attns, masks, matching and iou to wandb
-
-        visibility = examples["visibility"]
         ious.extend(iou_val[b, visibility[b]] for b in range(B))
         dices.extend(dice_val[b, visibility[b]] for b in range(B))
         epoch_bar.update(B)
+
+        # TODO: handle case where number of GT masks T != number of slots S
+
+        # First batch only, for the first 8 images save a figure with:
+        # - input image
+        # - attn maps per slot (ordered to match ground-truth)
+        # - thresholded attn maps per slot (ordered to match ground-truth)
+        # - overlay of img and thresholded attn maps per slot (ordered to match GT)
+        # - ground-truth masks and per-slot IoU
+        wandb_imgs = {}
+        if batch_idx == 0:
+            d = Path(f"epoch{epoch}/test")
+            d.mkdir(exist_ok=True, parents=True)
+
+            iou_idx = iou_idx.cpu().numpy()
+            images = unnormalize_pt(
+                images, cfg.data.normalize.mean, cfg.data.normalize.std
+            )
+            masks = masks.cpu()
+            obj_rollout = obj_rollout.cpu()
+            obj_rollout_thres = obj_rollout_thres.cpu()
+
+            for b in range(min(8, B)):
+                fig, axs = subplots_grid(5, T, ax_height_inch=1.5, dpi=72)
+                val_total = np.mean(iou_val[b, 1:], where=visibility[b, 1:])
+
+                axs[0, 0].imshow(to_pil_image(images[b]))
+                axs[0, 0].set_title(f"Image {b}")
+
+                # t: index of ground-truth mask, 0, 1, 2, ...
+                # s: index of attn mask that best matches with t
+                for t in range(T):
+                    s = iou_idx[b, t]
+                    axs[1, t].imshow(obj_rollout[b, s], interpolation="none")
+                    axs[2, t].imshow(obj_rollout_thres[b, s], interpolation="none")
+                    axs[3, t].imshow(
+                        to_pil_image(
+                            torch.where(
+                                obj_rollout_thres[b, s], images[b], 0.3 * images[b]
+                            )
+                        ),
+                    )
+                    axs[4, t].imshow(masks[b, t], interpolation="none")
+                    axs[4, t].set_xlabel(f"Mask {t} slot {s}\nIoU {iou_val[b, t]:.2f}")
+
+                axs[1, 0].set_ylabel("Attn")
+                axs[2, 0].set_ylabel("Thresholded")
+                axs[3, 0].set_ylabel("Overlay")
+                axs[4, 0].set_ylabel(f"Ground-truth\nIoU total {val_total:.2f}")
+
+                for ax in axs.flat:
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                for ax in axs[0, 1:]:
+                    ax.set_axis_off()
+
+                fig.set_facecolor("white")
+                fig.tight_layout(pad=0, h_pad=0, w_pad=0)
+                fig.savefig(d / f"img{b}.iou.png")
+                wandb_imgs[f"test/iou/img{b}"] = fig
+                plt.close(fig)
+        wandb.log(
+            {k: wandb.Image(v) for k, v in wandb_imgs.items()},
+            step=int(step_counter),
+            commit=False,
+        )
 
     epoch_bar.close()
     wandb.log(

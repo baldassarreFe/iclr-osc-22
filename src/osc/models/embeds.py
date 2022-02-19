@@ -41,27 +41,51 @@ class LearnedObjectTokens(nn.Module):
 
 
 class SampledObjectTokens(nn.Module):
-    """Dynamically sampled object tokens, shape ``[S C]``"""
+    """Dynamically sample ``S`` object tokens from ``K`` gaussian components.
 
-    def __init__(self, embed_dim: int, num_objects: int):
+    See :func:``forward``.
+    """
+
+    def __init__(self, embed_dim: int, num_objects: int, num_components: int = 1):
+        """
+
+        Args:
+            embed_dim: embedding dimension ``D``
+            num_objects: default number of objects tokens to sample ``S``
+            num_components: number of gaussian components to learn ``K``.
+                If greater than one, each object token is drawn from one of
+                ``K`` gaussians chosen uniformly at random with replacement.
+        """
         super(SampledObjectTokens, self).__init__()
-        self.mu = nn.Parameter(torch.zeros(embed_dim))
-        self.log_sigma = nn.Parameter(torch.zeros(embed_dim))
+        self.mu = nn.Parameter(torch.zeros(num_components, embed_dim))
+        self.log_sigma = nn.Parameter(torch.zeros(num_components, embed_dim))
         self.init_weights()
         self.num_objects = num_objects
 
     def init_weights(self):
-        # glorot/xavier uniform initialization
-        limit = np.sqrt(6 / self.mu.numel())
+        """Glorot/Xavier uniform initialization"""
+        embed_dim = self.mu.shape[-1]
+        limit = np.sqrt(6.0 / embed_dim)
         nn.init.uniform_(self.mu, -limit, +limit)
         nn.init.uniform_(self.log_sigma, -limit, +limit)
 
     def forward(self, batch_size: int, num_objects: int = None, seed: int = None):
+        """Forward.
+
+        Args:
+            batch_size: number of independent batches ``B``
+            num_objects: number of object tokens to sample ``S``
+            seed: optional random seed
+
+        Returns:
+            A tensor of sampled object tokens with shape ``[B S D]``
+        """
         device = self.mu.device
         B = batch_size
-        K = num_objects if num_objects is not None else self.num_objects
-        C = self.mu.shape[-1]
+        S = num_objects if num_objects is not None else self.num_objects
+        K, D = self.mu.shape
 
+        # Pick which random generator to use
         if seed is not None:
             rng = torch.Generator(device).manual_seed(seed)
         else:
@@ -73,17 +97,34 @@ class SampledObjectTokens(nn.Module):
                 rng = torch.Generator(device).manual_seed(18327415066407224732)
 
         # TODO: during val slots should be the same for all images,
-        #       but that makes val loss artificially low
-        if True or self.training:
-            # Sample BK independent vectors of length C
-            slots = torch.randn(B, K, C, device=device, generator=rng)
-        else:
-            # Sample K independent vectors of length C, then reuse them for all B images
-            slots = torch.randn(K, C, device=device, generator=rng)
-            slots = slots.expand(B, -1, -1)
+        #       but that makes val loss artificially low so the training
+        #       behavior is always enabled by doing `if True or` in two places
 
-        slots = self.mu + self.log_sigma.exp() * slots
-        return slots
+        # Sample from from a normal gaussian
+        if True or self.training:
+            # Sample B*S independent vectors of length D
+            slots = torch.randn(B, S, D, device=device, generator=rng)
+        else:
+            # Sample S independent vectors of length D, then reuse them for all B images
+            slots = torch.randn(1, S, D, device=device, generator=rng).expand(B, -1, -1)
+
+        # If the parameters describe a single component, use that single mu and sigma.
+        # Otherwise uniformly sample S (mu, sigma) pairs out of the K learned pairs.
+        if K == 1:
+            mu = self.mu
+            log_sigma = self.log_sigma
+        else:
+            if True or self.training:
+                # Choose S components for each image in the batch independently
+                idx = torch.randint(0, K, size=(B * S,), device=device, generator=rng)
+            else:
+                # Choose the same S components for all images in the batch
+                idx = torch.randint(0, K, size=(S,), device=device, generator=rng)
+            mu = self.mu[idx, :].reshape(-1, S, D).expand(B, S, D)
+            log_sigma = self.log_sigma[idx, :].reshape(-1, S, D).expand(B, S, D)
+
+        # Combine learned parameters (mu, sigma) and normal-distributed samples
+        return mu + log_sigma.exp() * slots
 
 
 class KmeansCosineObjectTokens(nn.Module):
