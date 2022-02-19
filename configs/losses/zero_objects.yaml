@@ -1,7 +1,7 @@
-# Global loss is weighted 20 times more than objects
-# Enable with: train.py +losses=more_global
+# Objects loss is computed but not used for gradient updates
+# Enable with: train.py +losses=zero_objects
 
 l_global:
   weight: 1.0
 l_objects:
-  weight: 0.05
+  weight: 0.0
