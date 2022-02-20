@@ -1,0 +1,7 @@
+# Enable with: train.py losses/l_objects=sim_img
+
+name: 'sim_img'
+weight: 1.0
+
+# Unused in the loss, only for visualization
+temp: 0.1

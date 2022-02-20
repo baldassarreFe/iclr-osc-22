@@ -40,6 +40,7 @@ from osc.loss_global import contrastive_loss, cosine_sim_loss
 from osc.loss_objects import (
     matching_contrastive_loss,
     matching_contrastive_loss_per_img,
+    matching_similarity_loss_per_img,
 )
 from osc.lr_scheduler import LinearWarmupCosineAnneal
 from osc.models.attentions import CrossAttentionDecoder, SlotAttention
@@ -446,6 +447,15 @@ def build_loss_fn_objects(cfg: DictConfig) -> ModelLoss:
 
         def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> None:
             return None
+
+    elif cfg.losses.l_objects.name == "sim_img":
+
+        def loss_fn_objects(output: ModelOutput, *, reduction="mean") -> Tensor:
+            return matching_similarity_loss_per_img(
+                output.f_slots,
+                output.p_slots,
+                reduction=reduction,
+            )
 
     elif cfg.losses.l_objects.name == "ctr_img":
 
@@ -870,8 +880,8 @@ def run_train_epoch(
         total=cfg.training.batch_size * bpe,
         desc=f"Train {epoch:>4d}",
         unit="img",
-        mininterval=30,
-        disable=None,  # auto disable on non-TTY
+        mininterval=10,
+        disable=not cfg.other.tqdm,
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
             "{elapsed}<{remaining}, {rate_fmt}{postfix}"
@@ -974,8 +984,8 @@ def run_val_epoch(
         total=cfg.data.val.max_samples,
         desc=f"Val   {epoch:>4d}",
         unit="img",
-        mininterval=30,
-        disable=None,  # auto disable on non-TTY
+        mininterval=10,
+        disable=not cfg.other.tqdm,
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
             "{elapsed}<{remaining}, {rate_fmt}{postfix}"
@@ -1379,8 +1389,8 @@ def run_test_segmentation(
         total=cfg.data.test.max_samples,
         desc=f"Test  {epoch:>4d}",
         unit="img",
-        mininterval=30,
-        disable=None,  # auto disable on non-TTY
+        mininterval=10,
+        disable=not cfg.other.tqdm,
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
             "{elapsed}<{remaining}, {rate_fmt}{postfix}"

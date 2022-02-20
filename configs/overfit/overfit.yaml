@@ -7,8 +7,10 @@ data:
     max_samples: 6400
   val:
     max_samples: 6400
+    epoch_interval: 1
   test:
     max_samples: 3200
+    epoch_interval: 1
 
 logging:
   tags: ['overfit']

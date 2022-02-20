@@ -20,7 +20,7 @@ def matching_contrastive_loss(
     embeddings of different augmentations of the same image. For each ``(i, i+B)``
     image pair, the ``K`` embeddings are 1:1 matched using linear-sum assignment
     to produce the targets for a ``2BK-1``-classes classification problem.
-    Except for the matching slot, all ``2BK-2`` slots of all images are considered
+    Except for the matching slot, all ``2BK-2`` x of all images are considered
     negative samples for the loss.
 
     If all slot embeddings collapse to the same value, the loss will be ``log(2BK-1)``.
@@ -38,11 +38,11 @@ def matching_contrastive_loss(
         reduction: 'mean', 'sum', or 'none'
 
     Returns:
-        Scalar loss over all samples and slots if reduction is 'mean' or 'sum'.
+        Scalar loss over all samples and x if reduction is 'mean' or 'sum'.
         A vector ``2BK`` of losses if reduction is 'none'
 
     Example:
-        A batch of ``B=4`` images, augmented twice, each with `K=3` slots.
+        A batch of ``B=4`` images, augmented twice, each with `K=3` x.
         The ``X`` represent positive matching targets for the cross entropy loss,
         the ``.`` represent negatives included in the loss (all except diagonal)::
 
@@ -142,10 +142,10 @@ def matching_contrastive_loss_per_img(
 ) -> Tensor:
     """Contrastive object-wise loss, only between corresponding images.
 
-    The ``K`` slots of the ``i``-th image are matched with the slots of the ``i+B``-th
+    The ``K`` x of the ``i``-th image are matched with the x of the ``i+B``-th
     image and vice versa. For each slot, the contrastive image considers the matching
-    slot in the corresponding image as positive. The other ``K-1`` slots in the
-    corresponding image as negatives, as well as the other ``K-1`` slots in the original
+    slot in the corresponding image as positive. The other ``K-1`` x in the
+    corresponding image as negatives, as well as the other ``K-1`` x in the original
     image. Slots are only matched between one image and its augmented version,
     never within the same image and never with other images.
 
@@ -157,11 +157,11 @@ def matching_contrastive_loss_per_img(
         reduction: 'mean', 'sum', or 'none'
 
     Returns:
-        Scalar loss over all samples and slots if reduction is 'mean' or 'sum'.
+        Scalar loss over all samples and x if reduction is 'mean' or 'sum'.
         A vector ``2BK`` of losses if reduction is 'none'
 
     Example:
-        A batch of ``B=4`` images, augmented twice, each with `K=3` slots.
+        A batch of ``B=4`` images, augmented twice, each with `K=3` x.
         The ``X`` represent positive matching targets for the cross entropy loss,
         the ``.`` represent negatives included in the loss (only from the augmented
         image and the image itself, but not the slot itself)::
@@ -269,40 +269,95 @@ def matching_contrastive_loss_per_img(
     return loss
 
 
-# TODO matching_similarity_loss
-"""
-class MatchingSimilarityLoss(nn.Module):
-    def __init__(self, embed_dim=128, loss_dim=128):
-        super().__init__()
-        self.proj = timm.models.layers.Mlp(
-            in_features=embed_dim,
-            hidden_features=embed_dim,
-            out_features=loss_dim,
-            act_layer=nn.GELU,
-            drop=0.0,
-        )
+def matching_similarity_loss_per_img(
+    f: Tensor, p: Tensor, reduction: str = "mean"
+) -> Tensor:
+    """Cosine similarity per object, only between corresponding images.
 
-    def forward(self, x):
-        x = slots
-        x = self.proj(x)
-        B = x.shape[0] // 2
+    The ``S`` slots of the ``i``-th image are matched with the slots of the ``i+B``-th
+    image and vice versa. The loss encourages high cosine similarity between pairs.
+    Similarity is defined as ``(1-cos)/2``.
 
-        # B K1 C, B K2 C -> B K1 K2
-        x = x / torch.linalg.vector_norm(x, dim=-1, keepdim=True)
-        x0, x1 = torch.split(x, B, dim=0)
-        cos = torch.einsum("bkc,blc->bkl", x0, x1).div_(-2).add_(0.5)
-        cos_np = cos.detach().numpy()
+    Args:
+        f: [2B, S, C] tensor of pre-projection image features
+        p: [2B, S, C] tensor of post-projection image features
+        reduction: 'mean', 'sum', or 'none'
 
-        loss = torch.tensor(0.0)
-        for b in range(B):
-            rows, cols = scipy.optimize.linear_sum_assignment(cos_np[b, :, :])
-            loss += cos[b, rows, cols].sum()
+    Returns:
+        Scalar loss over all samples and slots if reduction is 'mean' or 'sum'.
+        A vector ``2BS`` of losses if reduction is 'none'
 
-        loss.div_(B)
-        return loss
+    Example:
+        A batch of ``B=4`` images, augmented twice, each with `S=3` slots.
+        The ``X`` matching pairs whose cosine similarity will be increased.
+        When computing the cosine, the vectors along the column axis are detached
+        to prevent gradient propagation::
 
+                                    aug_0                    aug_1
+                           -----------------------  -----------------------
+                             0     1     2     3      0     1     2     3
+                  |       [     |     |     |     ||    X|     |     |     ]
+                  | img_0 [     |     |     |     ||  X  |     |     |     ]
+                  |       [     |     |     |     ||X    |     |     |     ]
+                  |       [-----+-----+-----+------------+-----+-----+-----]
+                  |       [     |     |     |     ||     |X    |     |     ]
+                  | img_1 [     |     |     |     ||     |  X  |     |     ]
+                  |       [     |     |     |     ||     |    X|     |     ]
+            aug_0 |       [-----+-----+-----+------------+-----+-----+-----]
+                  |       [     |     |     |     ||     |     |    X|     ]
+                  | img_2 [     |     |     |     ||     |     |X    |     ]
+                  |       [     |     |     |     ||     |     |  X  |     ]
+                  |       [-----+-----+-----+------------+-----+-----+-----]
+                  |       [     |     |     |     ||     |     |     |    X]
+                  | img_3 [     |     |     |     ||     |     |     |  X  ]
+                  |       [     |     |     |     ||     |     |     |X    ]
+                          [=====|=====|=====|============|=====|=====|=====]
+                  |       [    X|     |     |     ||     |     |     |     ]
+                  | img_0 [  X  |     |     |     ||     |     |     |     ]
+                  |       [X    |     |     |     ||     |     |     |     ]
+                  |       [-----+-----+-----+------------+-----+-----+-----]
+                  |       [     |X    |     |     ||     |     |     |     ]
+                  | img_1 [     |  X  |     |     ||     |     |     |     ]
+                  |       [     |    X|     |     ||     |     |     |     ]
+            aug_1 |       [-----+-----+-----+------------+-----+-----+-----]
+                  |       [     |     |  X  |     ||     |     |     |     ]
+                  | img_2 [     |     |    X|     ||     |     |     |     ]
+                  |       [     |     |X    |     ||     |     |     |     ]
+                  |       [-----+-----+-----+------------+-----+-----+-----]
+                  |       [     |     |     |    X||     |     |     |     ]
+                  | img_3 [     |     |     |  X  ||     |     |     |     ]
+                  |       [     |     |     |X    ||     |     |     |     ]
+    """
+    # f: [2B S C] -> [2 B S C]
+    A = 2
+    B, S, D = f.shape
+    B //= A
+    f = l2_normalize(f.detach()).reshape(A, B, S, D)
+    p = l2_normalize(p).reshape(A, B, S, D)
 
-matching_similarity_loss_fn = MatchingSimilarityLoss(embed_dim, embed_dim)
-matching_sim_loss = matching_similarity_loss_fn(slots)
-print(matching_sim_loss)
-"""
+    # Cosine similarity of all slots in one image with all slots in its aug version,
+    # will be used to compute the matching pairs. However, the loss is defined between
+    # the detached pre-projection features and the post-projection features.
+    # cos: [B S T], T=S
+    # cos[b, s, t] = cos(f[0, b, s], f[1, b, t])
+    cos = torch.einsum("bsc,btc->bst", f[0], f[1]).cpu().numpy()
+
+    # Find matches and accumulate cosine similarity of matching pairs
+    sim = torch.zeros((A, B, S), device=f.device)
+    for b in range(B):
+        # First output is a vector of sorted row indices [0, 1, ..., S]
+        _, cols = scipy.optimize.linear_sum_assignment(cos[b, :, :], maximize=True)
+
+        # Top-right quadrant in the example matrix above
+        sim[0, b, :] += torch.sum(p[0, b, :] * f[1, b, cols], dim=-1)
+
+        # Bottom-left quadrant in the example matrix above (symmetric)
+        cols_t = np.argsort(cols)
+        sim[1, b, :] += torch.sum(p[1, b, :] * f[0, b, cols_t], dim=-1)
+
+    if reduction == "sum":
+        sim = sim.sum()
+    elif reduction == "mean":
+        sim = sim.mean()
+
+    return (1 - sim) / 2

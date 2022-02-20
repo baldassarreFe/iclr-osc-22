@@ -17,5 +17,6 @@ training:
 
 other:
   debug: false
+  tqdm: true
   seed: null # defaults to random
   device: 'cuda:0'
