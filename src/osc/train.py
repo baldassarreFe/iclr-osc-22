@@ -787,6 +787,7 @@ def run_train_val_viz_epochs(
     step_counter = StepCounter()
     with SigIntCatcher() as should_stop:
         for epoch in range(cfg.training.num_epochs):
+            start = time.time()
             is_last = epoch == cfg.training.num_epochs - 1
 
             run_train_epoch(
@@ -828,7 +829,7 @@ def run_train_val_viz_epochs(
                     f"./checkpoint.{epoch}.pth",
                 )
 
-            log.info("Done epoch %d", epoch)
+            log.info("Done epoch %d in %.1f minutes", epoch, (time.time() - start) / 60)
             if should_stop:
                 break
     log.info("Done training for %d/%d epochs", epoch + 1, cfg.training.num_epochs)
@@ -869,6 +870,8 @@ def run_train_epoch(
         total=cfg.training.batch_size * bpe,
         desc=f"Train {epoch:>4d}",
         unit="img",
+        mininterval=30,
+        disable=None,  # auto disable on non-TTY
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
             "{elapsed}<{remaining}, {rate_fmt}{postfix}"
@@ -971,6 +974,8 @@ def run_val_epoch(
         total=cfg.data.val.max_samples,
         desc=f"Val   {epoch:>4d}",
         unit="img",
+        mininterval=30,
+        disable=None,  # auto disable on non-TTY
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
             "{elapsed}<{remaining}, {rate_fmt}{postfix}"
@@ -1374,6 +1379,8 @@ def run_test_segmentation(
         total=cfg.data.test.max_samples,
         desc=f"Test  {epoch:>4d}",
         unit="img",
+        mininterval=30,
+        disable=None,  # auto disable on non-TTY
         bar_format=(
             "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
             "{elapsed}<{remaining}, {rate_fmt}{postfix}"
