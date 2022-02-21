@@ -65,7 +65,13 @@ def img_hwc_to_chw(img: tf.Tensor) -> tf.Tensor:
 
 @tf.function
 def augment_train(
-    img: tf.Tensor, *, seed: tf.Tensor, crop_size: ImgSizeHW, mean: ImgMean, std: ImgStd
+    img: tf.Tensor,
+    *,
+    seed: tf.Tensor,
+    crop_size: ImgSizeHW,
+    crop_scale: Tuple[float, float],
+    mean: ImgMean,
+    std: ImgStd
 ) -> tf.Tensor:
     """Augment image for train/val. Pass different seeds to get different augmentations.
 
@@ -73,16 +79,24 @@ def augment_train(
 
     - uint8 [0-255] -> float32 [0-1]
     - random flip
-    - random resized crop (random aspect ratio, zoom factor, resize to ``crop_size``
+    - random resized crop (random aspect ratio, zoom factor, resize to ``crop_size``)
     - color jitter (brightness, saturation, hue)
     - normalization to given ``mean`` and ``std``
     - pytorch channel order [H W C] -> [C H W]
+
+    Args:
+        img: tf.uint8 tensor
+        seed: random seed used as base seed for all transformations
+        crop_size: size of the image after cropping
+        crop_scale: minimum and maximum crop scale for example ``(0.3, 1.0)``
+        mean: image mean for normalization
+        std: image std for normalization
     """
     img = tf.image.convert_image_dtype(img, tf.float32)
 
     seeds = tf.random.experimental.stateless_split(seed, num=5)
     img = tf.image.stateless_random_flip_left_right(img, seeds[0])
-    img = random_resized_crop(img, size=crop_size, scale=(0.3, 1.0), seed=seeds[1])
+    img = random_resized_crop(img, size=crop_size, scale=crop_scale, seed=seeds[1])
     img = tf.image.stateless_random_brightness(img, 0.2, seeds[2])
     img = tf.image.stateless_random_saturation(img, 0.9, 1.0, seeds[3])
     img = tf.image.stateless_random_hue(img, 0.05, seeds[4])

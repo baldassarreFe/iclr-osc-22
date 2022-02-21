@@ -525,6 +525,7 @@ def build_dataset_train(cfg):
     augment_fn = partial(
         augment_train,
         crop_size=tuple(cfg.data.crop_size),
+        crop_scale=tuple(cfg.data.crop_scale),
         mean=tuple(cfg.data.normalize.mean),
         std=tuple(cfg.data.normalize.std),
     )
@@ -609,6 +610,7 @@ def build_dataset_val(cfg: DictConfig) -> Iterable:
     augment_fn = partial(
         augment_train,
         crop_size=tuple(cfg.data.crop_size),
+        crop_scale=tuple(cfg.data.crop_scale),
         mean=tuple(cfg.data.normalize.mean),
         std=tuple(cfg.data.normalize.std),
     )
@@ -805,6 +807,7 @@ def get_viz_batch(cfg: DictConfig) -> np.ndarray:
     augment_fn = partial(
         augment_train,
         crop_size=tuple(cfg.data.crop_size),
+        crop_scale=tuple(cfg.data.crop_scale),
         mean=tuple(cfg.data.normalize.mean),
         std=tuple(cfg.data.normalize.std),
     )
@@ -1661,7 +1664,7 @@ def run_test_linear_probes(
             torch.nn.functional.binary_cross_entropy_with_logits(
                 preds, targets_test, reduction="none"
             )
-            .mean(dim=1)
+            .mean(dim=0)
             .cpu()
             .numpy()
         )

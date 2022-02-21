@@ -1,6 +1,7 @@
 root: '~/multi-object-datasets'
 name: CLEVR10
 crop_size: [128, 128]
+crop_scale: [0.3, 1.0]
 
 normalize:
   mean: [0.485, 0.456, 0.406]
