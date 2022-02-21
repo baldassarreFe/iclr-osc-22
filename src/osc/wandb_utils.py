@@ -19,8 +19,12 @@ EXCLUDE_HPARAMS = (
 
 
 def setup_wandb(cfg):
-    """Create wandb run, log hyperparams, auto upload checkpoints"""
-    hparams = filter_cfg_for_wandb(cfg)
+    """Create wandb run, save config, log, and hyperparameters"""
+    if cfg.other.debug:
+        mode = "disabled"
+        log.info("Debug run, wandb disabled")
+    else:
+        mode = "online"
     wandb.init(
         project=cfg.logging.project,
         group=cfg.logging.group,
@@ -28,16 +32,17 @@ def setup_wandb(cfg):
         name=cfg.logging.name,
         tags=cfg.logging.tags,
         notes=cfg.logging.notes,
-        config=hparams,
-        mode="online" if not cfg.other.debug else "disabled",
+        config=filter_cfg_for_wandb(cfg),
+        mode=mode,
     )
+    wandb.save("train.yaml", policy="now")
+    wandb.save("train.log", policy="live")
     wandb.save("checkpoint.*.pth", policy="live")
-    wandb.save("*.yaml", policy="live")
-    if cfg.other.debug:
-        log.info("Debug run, wandb disabled")
 
 
 def filter_cfg_for_wandb(cfg, exclude=None):
+    """Remove unwanted entries for wandb config."""
+
     def delete_(d: MutableMapping[str, Any], k: str):
         k = k.split(".", maxsplit=1)
         if len(k) == 1:
@@ -54,11 +59,21 @@ def filter_cfg_for_wandb(cfg, exclude=None):
 
 
 def find_run_by_name(name, output_dir: Union[Path, str] = None) -> Path:
+    """Find a run by wandb name/id by grepping all train.yaml files under a folder"""
     p = subprocess.run(
-        ["grep", name, "--include=train.yaml", "-r", ".", "--files-with-matches"],
+        [
+            "grep",
+            "--include=train.yaml",
+            "--exclude-dir=wandb",
+            "--files-with-matches",
+            "-R",  # Capital R -> follow symlinks
+            name,
+            ".",
+        ],
         capture_output=True,
         text=True,
         cwd=output_dir,
+        check=True,
     )
     outputs = p.stdout.splitlines()
     if len(outputs) == 0:
