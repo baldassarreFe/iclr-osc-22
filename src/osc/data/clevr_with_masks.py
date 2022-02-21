@@ -28,6 +28,8 @@ NUM_SAMPLES_TRAIN = 70_000
 NUM_SAMPLES_VAL = 15_000
 NUM_SAMPLES_TEST = 15_000
 
+decode = multi_object_datasets.clevr_with_masks._decode
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -62,12 +64,12 @@ def main():
                 )
                 exit(-1)
 
-    def process(idx, example):
+    def process_train_val_test(idx, example_):
         if idx >= NUM_SAMPLES_TRAIN + NUM_SAMPLES_VAL:
-            return example
-        example = multi_object_datasets.clevr_with_masks._decode(example)
-        example = tf.py_function(serialize_image, (example["image"],), tf.string)
-        return example
+            return example_
+        example_ = decode(example_)
+        example_ = tf.py_function(serialize_image, (example_["image"],), tf.string)
+        return example_
 
     ds = (
         tf.data.TFRecordDataset(
@@ -76,7 +78,7 @@ def main():
         )
         .enumerate()
         .map(
-            process,
+            process_train_val_test,
             num_parallel_calls=tf.data.AUTOTUNE,
             deterministic=True,
         )
@@ -208,6 +210,50 @@ def prepare_test_segmentation(
     # image: [3 H W]
     # mask: [C H W]
     return {"image": image, "mask": mask, "visibility": example["visibility"]}
+
+
+@tf.function
+def prepare_test_vqa(
+    example,
+    img_size: ImgSizeHW,
+    crop_size: ImgSizeHW,
+    mean: ImgMean,
+    std: ImgStd,
+):
+    """Prepare a test example for VQA (center crop+normalization)
+
+    Args:
+        example:
+        img_size: image size ``(H, W)``
+        crop_size: crop size ``(H, W)``
+        mean: image mean for normalization
+        std: image standard deviation for normalization
+
+    Returns:
+        A dict containing the image ``[3 H W]`` and the vqa_target ``[V]``
+    """
+    # image: [H W 3]
+    image = example["image"]
+
+    H, W = img_size
+    S = min(H, W)
+    y0 = (H - S) // 2
+    x0 = (W - S) // 2
+    y1 = (H + S) // 2
+    x1 = (W + S) // 2
+
+    image = image[y0:y1, x0:x1, :]
+
+    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = normalize_tf(image, mean, std)
+    image = tf.image.resize(image, crop_size)
+    image = tf.transpose(image, [2, 0, 1])
+
+    eight = tf.constant([1, 2, 3, 4, 5, 6, 7, 8], dtype=tf.uint8)
+    color = tf.reduce_any(example["color"][None, :] == eight[:, None], axis=1)
+    vqa_target = color
+
+    return {"image": image, "vqa_target": vqa_target}
 
 
 def get_iterator(

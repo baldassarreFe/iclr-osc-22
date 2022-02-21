@@ -10,11 +10,11 @@ from collections import defaultdict
 from contextlib import suppress
 from functools import partial
 from itertools import islice
+from operator import attrgetter
 from pathlib import Path
-from typing import Iterable, List, Optional, Protocol
+from typing import Callable, Iterable, List, Optional, Protocol
 
 import hydra
-import multi_object_datasets.clevr_with_masks
 import namesgenerator
 import numpy as np
 import omegaconf
@@ -28,6 +28,7 @@ import tqdm
 import wandb
 import wandb.util
 from einops import rearrange, reduce
+from einops.layers.torch import Reduce
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
 from torch import Tensor
@@ -86,6 +87,7 @@ def main(cfg: DictConfig) -> None:
     ds_train = build_dataset_train(cfg)
     ds_val = build_dataset_val(cfg)
     ds_test = build_dataset_test(cfg)
+    ds_vqa = build_dataset_vqa(cfg)
     viz_batch = get_viz_batch(cfg)
 
     model = build_model(cfg).to(cfg.other.device)
@@ -103,6 +105,7 @@ def main(cfg: DictConfig) -> None:
         ds_train,
         ds_val,
         ds_test,
+        ds_vqa,
         viz_batch,
         loss_fn_global,
         loss_fn_objects,
@@ -189,6 +192,7 @@ def update_cfg(cfg: DictConfig, readonly=True):
 
 def log_env_info():
     log.info("PID: %d", os.getpid())
+    log.info("Run dir: %s", Path.cwd().relative_to(hydra.utils.get_original_cwd()))
 
     conda = [f"{k}={v}" for k, v in os.environ.items() if k.startswith("CONDA_")]
     if len(conda) > 0:
@@ -663,7 +667,7 @@ def build_dataset_test(cfg: DictConfig) -> tf.data.Dataset:
             )
             .take(cfg.data.test.max_samples)
             .map(
-                multi_object_datasets.clevr_with_masks._decode,
+                osc.data.clevr_with_masks.decode,
                 num_parallel_calls=tf.data.AUTOTUNE,
                 deterministic=True,
             )
@@ -693,7 +697,66 @@ def build_dataset_test(cfg: DictConfig) -> tf.data.Dataset:
     ds = ds.prefetch(tf.data.AUTOTUNE)
 
     log.info(
-        "Dataset test, %d samples, %d batch size, %d batches",
+        "Dataset test segmentation, %d samples, %d batch size, %d batches",
+        cfg.data.test.max_samples,
+        cfg.training.batch_size,
+        batches_per_epoch_test(cfg),
+    )
+    return ds
+
+
+def build_dataset_vqa(cfg: DictConfig) -> tf.data.Dataset:
+    """Build VQA dataset for linear probing.
+
+    Args:
+        cfg: configuration
+
+    Returns:
+        VQA dataset.
+    """
+    if cfg.data.name == "CLEVR10":
+        tfr_path = Path(cfg.data.root) / "clevr_with_masks" / "imgs_test.tfrecords"
+        img_size = osc.data.clevr_with_masks.IMAGE_SIZE
+        if cfg.data.test.max_samples > osc.data.clevr_with_masks.NUM_SAMPLES_TEST:
+            raise ValueError(cfg.data.test.max_samples)
+
+        ds = (
+            tf.data.TFRecordDataset(
+                tfr_path.expanduser().resolve().as_posix(), compression_type="GZIP"
+            )
+            .take(cfg.data.test.max_samples)
+            .map(
+                osc.data.clevr_with_masks.decode,
+                num_parallel_calls=tf.data.AUTOTUNE,
+                deterministic=True,
+            )
+            .map(
+                osc.data.clevr_with_masks.fix_tf_dtypes,
+                num_parallel_calls=tf.data.AUTOTUNE,
+                deterministic=True,
+            )
+            .map(
+                partial(
+                    osc.data.clevr_with_masks.prepare_test_vqa,
+                    img_size=tuple(img_size),
+                    crop_size=tuple(cfg.data.crop_size),
+                    mean=tuple(cfg.data.normalize.mean),
+                    std=tuple(cfg.data.normalize.std),
+                ),
+                num_parallel_calls=tf.data.AUTOTUNE,
+                deterministic=True,
+            )
+        )
+    else:
+        raise ValueError(cfg.data.name)
+
+    # Other stuff
+    ds = ds.batch(cfg.training.batch_size, drop_remainder=False)
+    ds = ds.enumerate()
+    ds = ds.prefetch(tf.data.AUTOTUNE)
+
+    log.info(
+        "Dataset test VQA, %d samples, %d batch size, %d batches",
         cfg.data.test.max_samples,
         cfg.training.batch_size,
         batches_per_epoch_test(cfg),
@@ -775,6 +838,7 @@ def run_train_val_viz_epochs(
     ds_train: Iterable,
     ds_val: Iterable,
     ds_test: tf.data.Dataset,
+    ds_vqa: tf.data.Dataset,
     viz_batch: np.ndarray,
     loss_fn_global: ModelLoss,
     loss_fn_objects: ModelLoss,
@@ -789,6 +853,7 @@ def run_train_val_viz_epochs(
         ds_train:
         ds_val:
         ds_test:
+        ds_vqa:
         viz_batch:
         loss_fn_global:
         loss_fn_objects:
@@ -817,6 +882,7 @@ def run_train_val_viz_epochs(
 
             if epoch % cfg.data.test.epoch_interval == 0 or is_last or should_stop:
                 run_test_segmentation(cfg, ds_test, epoch, model, step_counter)
+                run_test_linear_probes(cfg, ds_vqa, epoch, model, step_counter)
 
             if epoch % cfg.data.viz.epoch_interval == 0 or is_last or should_stop:
                 run_viz(
@@ -1512,6 +1578,103 @@ def run_test_segmentation(
             "test/dice/by_img_no_bg": np.mean(
                 [img_dices[1:].mean() for img_dices in dices]
             ),
+        },
+        commit=False,
+        step=int(step_counter),
+    )
+
+
+def run_test_linear_probes(
+    cfg: DictConfig,
+    ds_vqa: tf.data.Dataset,
+    epoch: int,
+    model: Model,
+    step_counter: StepCounter,
+):
+    features = []
+    targets = []
+    model.eval()
+    if cfg.model.architecture == "backbone-global_fn-global_proj":
+        get_feats: Callable[[ModelOutput], Tensor] = attrgetter("f_global")
+    elif cfg.model.architecture in {
+        "backbone(-global_fn-global_proj)-obj_fn-obj_proj",
+        "backbone-obj_fn(-global_fn-global_proj)-obj_proj",
+    }:
+        get_feats: Callable[[ModelOutput], Tensor] = attrgetter("f_slots")
+    else:
+        raise ValueError(cfg.model.architecture)
+    with torch.no_grad():
+        epoch_bar = tqdm.tqdm(
+            total=cfg.data.test.max_samples,
+            desc=f"VQA   {epoch:>4d}",
+            unit="img",
+            mininterval=10,
+            disable=not cfg.other.tqdm,
+            bar_format=(
+                "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
+                "{elapsed}<{remaining}, {rate_fmt}{postfix}"
+            ),
+        )
+        for batch_idx, examples in ds_vqa.as_numpy_iterator():
+            images = torch.from_numpy(np.copy(examples["image"]))
+            output = model(images.to(cfg.other.device))
+            features.append(get_feats(output).cpu())
+            targets.append(examples["vqa_target"])
+            epoch_bar.update(images.shape[0])
+        epoch_bar.close()
+
+    split = int(0.75 * len(features))
+    features = torch.cat(features).to(cfg.other.device)
+    features_train = features[:split]
+    features_test = features[split:]
+    targets = torch.from_numpy(np.concatenate(targets)).float().to(cfg.other.device)
+    targets_train = targets[:split]
+    targets_test = targets[split:]
+
+    if cfg.model.architecture == "backbone-global_fn-global_proj":
+        probe = torch.nn.Linear(features.shape[-1], targets.shape[-1])
+    elif cfg.model.architecture in {
+        "backbone(-global_fn-global_proj)-obj_fn-obj_proj",
+        "backbone-obj_fn(-global_fn-global_proj)-obj_proj",
+    }:
+        probe = torch.nn.Sequential(
+            torch.nn.Linear(features.shape[-1], targets.shape[-1]),
+            Reduce("B S C -> B C", reduction="max"),
+        )
+    else:
+        raise ValueError(cfg.model.architecture)
+    probe.to(cfg.other.device)
+    optimizer = torch.optim.AdamW(probe.parameters())
+    for _ in range(100):
+        optimizer.zero_grad()
+        preds = probe(features_train)
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(
+            preds,
+            targets_train,
+        )
+        loss.backward()
+        optimizer.step()
+
+    with torch.no_grad():
+        preds = probe(features_test)
+        loss = (
+            torch.nn.functional.binary_cross_entropy_with_logits(
+                preds, targets_test, reduction="none"
+            )
+            .mean(dim=1)
+            .cpu()
+            .numpy()
+        )
+        accuracy = (
+            torch.mean(((preds > 0) == targets_test).float(), dim=0).cpu().numpy()
+        )
+
+    log.info("VQA loss: %s", loss.round(3))
+    log.info("VQA acc : %s", (accuracy * 100).round(1))
+    wandb.log(
+        {
+            "vqa/loss": loss.mean(),
+            "vqa/accuracy": accuracy.mean(),
         },
         commit=False,
         step=int(step_counter),
