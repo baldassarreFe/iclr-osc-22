@@ -3,4 +3,4 @@ warmup:
 decay:
   name: 'cosine'
   epochs: 20
-  end_lr: 0.0
+  end_lr: 0.0003
