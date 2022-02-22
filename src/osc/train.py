@@ -12,12 +12,13 @@ from functools import partial
 from itertools import islice
 from operator import attrgetter
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Protocol
+from typing import Callable, Iterable, List, Optional, Protocol, Tuple
 
 import hydra
 import namesgenerator
 import numpy as np
 import omegaconf
+import pandas as pd
 import PIL.Image
 import submitit
 import tabulate
@@ -31,7 +32,12 @@ from einops import rearrange, reduce
 from einops.layers.torch import Reduce
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
-from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.metrics import (
+    PrecisionRecallDisplay,
+    RocCurveDisplay,
+    average_precision_score,
+    roc_auc_score,
+)
 from torch import Tensor
 from torchvision.transforms.functional import to_pil_image
 
@@ -1595,6 +1601,137 @@ def run_test_linear_probes(
     model: Model,
     step_counter: StepCounter,
 ):
+    wandb_imgs = {}
+
+    features, targets = extract_vqa_features(cfg, ds_vqa, epoch, model)
+    split = int(cfg.data.test.vqa.split * len(features))
+    features_train = features[:split].to(cfg.other.device)
+    features_test = features[split:].to(cfg.other.device)
+    targets_train = targets[:split].float().to(cfg.other.device)
+    targets_test = targets[split:].float().to(cfg.other.device)
+
+    # For each True label there are 14 False labels
+    loss_fn = torch.nn.BCEWithLogitsLoss(
+        pos_weight=(
+            None
+            if cfg.data.test.vqa.pos_weight is None
+            else torch.tensor(cfg.data.test.vqa.pos_weight)
+        )
+    )
+    torch.manual_seed(cfg.data.test.vqa.seed)
+    probe = build_linear_probe(cfg, targets.shape[-1]).to(cfg.other.device)
+    optimizer = torch.optim.AdamW(probe.parameters())
+
+    # region Train
+    hist = []
+    for i in tqdm.trange(
+        cfg.data.test.vqa.num_epochs,
+        desc=f"VQA p {epoch:>4d}",
+        ncols=0,
+        mininterval=10,
+        disable=not cfg.other.tqdm,
+    ):
+        with torch.no_grad():
+            preds = probe(features_test)
+            loss_test = loss_fn(preds.flatten(), targets_test.flatten())
+
+        optimizer.zero_grad()
+        preds = probe(features_train)
+        loss_train = loss_fn(preds.flatten(), targets_train.flatten())
+        loss_train.backward()
+        optimizer.step()
+
+        hist.append((i, loss_train.item(), loss_test.item()))
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 4))
+    df = pd.DataFrame(hist, columns=["step", "train", "val"]).set_index("step")
+    df.plot(ax=axs[0])
+    df[cfg.data.test.vqa.num_epochs // 2 :].plot(ax=axs[1])
+    axs[0].set_ylabel("Loss")
+    axs[0].set_title("Linear probe optimization")
+    fig.set_facecolor("white")
+    wandb_imgs["vqa/linear"] = wandb.Image(fig)
+    # endregion
+
+    with torch.no_grad():
+        preds = probe(features_test)
+        loss_test = loss_fn(preds, targets_test).item()
+        targets_test = targets_test.cpu().numpy().astype(bool)
+        sample_weight = np.where(targets_test.flatten(), 14.0, 1.0)
+        preds = preds.sigmoid_().cpu().numpy()
+
+    for plot_name, plot_fn in [
+        ("vqa/pr", PrecisionRecallDisplay.from_predictions),
+        ("vqa/roc", RocCurveDisplay.from_predictions),
+    ]:
+        fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+        plot_fn(
+            y_true=targets_test.flatten(),
+            y_pred=preds.flatten(),
+            ax=ax,
+            name="Not adjusted",
+        )
+        plot_fn(
+            y_true=targets_test.flatten(),
+            y_pred=preds.flatten(),
+            sample_weight=sample_weight,
+            ax=ax,
+            name="Adjusted",
+        )
+        fig.set_facecolor("white")
+        wandb_imgs[plot_name] = wandb.Image(fig)
+
+    ap = average_precision_score(
+        y_true=targets_test.flatten(),
+        y_score=preds.flatten(),
+        sample_weight=sample_weight,
+    )
+    auroc = roc_auc_score(
+        y_true=targets_test.flatten(),
+        y_score=preds.flatten(),
+        sample_weight=sample_weight,
+    )
+
+    log.info(
+        "VQA: loss %.3f, average precision %.2f, auroc %.2f",
+        loss_test,
+        100 * ap,
+        100 * auroc,
+    )
+    wandb.log(
+        {
+            "vqa/loss": loss_test,
+            "vqa/ap": ap,
+            "vqa/auroc": auroc,
+            **wandb_imgs,
+        },
+        commit=False,
+        step=int(step_counter),
+    )
+
+
+def build_linear_probe(cfg, output_classes: int) -> torch.nn.Module:
+    D = cfg.model.backbone.embed_dim
+
+    if cfg.model.architecture == "backbone-global_fn-global_proj":
+        return torch.nn.Linear(D, output_classes)
+
+    if cfg.model.architecture in {
+        "backbone(-global_fn-global_proj)-obj_fn-obj_proj",
+        "backbone-obj_fn(-global_fn-global_proj)-obj_proj",
+    }:
+        return torch.nn.Sequential(
+            torch.nn.Linear(D, output_classes),
+            Reduce("B S C -> B C", reduction="max"),
+        )
+
+    raise ValueError(cfg.model.architecture)
+
+
+@torch.no_grad()
+def extract_vqa_features(
+    cfg: DictConfig, ds_vqa: tf.data.Dataset, epoch: int, model: Model
+) -> Tuple[Tensor, Tensor]:
     features = []
     targets = []
     model.eval()
@@ -1607,91 +1744,26 @@ def run_test_linear_probes(
         get_feats: Callable[[ModelOutput], Tensor] = attrgetter("f_slots")
     else:
         raise ValueError(cfg.model.architecture)
-    with torch.no_grad():
-        epoch_bar = tqdm.tqdm(
-            total=cfg.data.test.max_samples,
-            desc=f"VQA   {epoch:>4d}",
-            unit="img",
-            mininterval=10,
-            disable=not cfg.other.tqdm,
-            bar_format=(
-                "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
-                "{elapsed}<{remaining}, {rate_fmt}{postfix}"
-            ),
-        )
-        for batch_idx, examples in ds_vqa.as_numpy_iterator():
-            images = torch.from_numpy(np.copy(examples["image"]))
-            output = model(images.to(cfg.other.device))
-            features.append(get_feats(output).cpu())
-            targets.append(examples["vqa_target"])
-            epoch_bar.update(images.shape[0])
-        epoch_bar.close()
 
-    split = int(0.75 * len(features))
-    features = torch.cat(features).to(cfg.other.device)
-    features_train = features[:split]
-    features_test = features[split:]
-    targets = torch.from_numpy(np.concatenate(targets)).float().to(cfg.other.device)
-    targets_train = targets[:split]
-    targets_test = targets[split:]
-
-    if cfg.model.architecture == "backbone-global_fn-global_proj":
-        probe = torch.nn.Linear(features.shape[-1], targets.shape[-1])
-    elif cfg.model.architecture in {
-        "backbone(-global_fn-global_proj)-obj_fn-obj_proj",
-        "backbone-obj_fn(-global_fn-global_proj)-obj_proj",
-    }:
-        probe = torch.nn.Sequential(
-            torch.nn.Linear(features.shape[-1], targets.shape[-1]),
-            Reduce("B S C -> B C", reduction="max"),
-        )
-    else:
-        raise ValueError(cfg.model.architecture)
-    probe.to(cfg.other.device)
-    optimizer = torch.optim.AdamW(probe.parameters())
-    for _ in range(100):
-        optimizer.zero_grad()
-        preds = probe(features_train)
-        loss = torch.nn.functional.binary_cross_entropy_with_logits(
-            preds,
-            targets_train,
-        )
-        loss.backward()
-        optimizer.step()
-
-    with torch.no_grad():
-        preds = probe(features_test)
-        loss = (
-            torch.nn.functional.binary_cross_entropy_with_logits(
-                preds, targets_test, reduction="none"
-            )
-            .mean()
-            .item()
-        )
-
-        targets_test = targets_test.cpu().numpy().astype(bool)
-        preds = preds.sigmoid_().cpu().numpy()
-
-    ap = average_precision_score(y_true=targets_test, y_score=preds, average="weighted")
-    auroc = roc_auc_score(y_true=targets_test, y_score=preds, average="weighted")
-
-    log.info(
-        "VQA: loss %.3f, average precision %.2f, auroc %.2f",
-        loss,
-        100 * ap,
-        100 * auroc,
+    epoch_bar = tqdm.tqdm(
+        total=cfg.data.test.max_samples,
+        desc=f"VQA f {epoch:>4d}",
+        unit="img",
+        mininterval=10,
+        disable=not cfg.other.tqdm,
+        bar_format=(
+            "{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt}, "
+            "{elapsed}<{remaining}, {rate_fmt}{postfix}"
+        ),
     )
-    wandb.log(
-        {
-            "vqa/loss": loss,
-            "vqa/ap": ap,
-            "vqa/auroc": auroc,
-            "vqa/pr": wandb.plot.pr_curve(
-                targets_test.flatten(),
-                np.stack([np.zeros_like(preds).flatten(), preds.flatten()], axis=1),
-                classes_to_plot=[1],
-            ),
-        },
-        commit=False,
-        step=int(step_counter),
-    )
+    for batch_idx, examples in ds_vqa.as_numpy_iterator():
+        images = torch.from_numpy(np.copy(examples["image"]))
+        output = model(images.to(cfg.other.device))
+        features.append(get_feats(output).cpu())
+        targets.append(examples["vqa_target"])
+        epoch_bar.update(images.shape[0])
+    epoch_bar.close()
+
+    features = torch.cat(features)
+    targets = torch.from_numpy(np.concatenate(targets))
+    return features, targets

@@ -23,3 +23,8 @@ viz:
 test:
   max_samples: null # defaults to all
   epoch_interval: 5
+  vqa:
+    seed: 759443315
+    num_epochs: 10000
+    split: 0.75
+    pos_weight: 14.0
