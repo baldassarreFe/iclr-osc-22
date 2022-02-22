@@ -31,6 +31,7 @@ from einops import rearrange, reduce
 from einops.layers.torch import Reduce
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
+from sklearn.metrics import average_precision_score, roc_auc_score
 from torch import Tensor
 from torchvision.transforms.functional import to_pil_image
 
@@ -1664,20 +1665,32 @@ def run_test_linear_probes(
             torch.nn.functional.binary_cross_entropy_with_logits(
                 preds, targets_test, reduction="none"
             )
-            .mean(dim=0)
-            .cpu()
-            .numpy()
-        )
-        accuracy = (
-            torch.mean(((preds > 0) == targets_test).float(), dim=0).cpu().numpy()
+            .mean()
+            .item()
         )
 
-    log.info("VQA loss: %s", loss.round(3))
-    log.info("VQA acc : %s", (accuracy * 100).round(1))
+        targets_test = targets_test.cpu().numpy().astype(bool)
+        preds = preds.sigmoid_().cpu().numpy()
+
+    ap = average_precision_score(y_true=targets_test, y_score=preds, average="weighted")
+    auroc = roc_auc_score(y_true=targets_test, y_score=preds, average="weighted")
+
+    log.info(
+        "VQA: loss %.3f, average precision %.2f, auroc %.2f",
+        loss,
+        100 * ap,
+        100 * auroc,
+    )
     wandb.log(
         {
-            "vqa/loss": loss.mean(),
-            "vqa/accuracy": accuracy.mean(),
+            "vqa/loss": loss,
+            "vqa/ap": ap,
+            "vqa/auroc": auroc,
+            "vqa/pr": wandb.plot.pr_curve(
+                targets_test.flatten(),
+                np.stack([np.zeros_like(preds).flatten(), preds.flatten()], axis=1),
+                classes_to_plot=[1],
+            ),
         },
         commit=False,
         step=int(step_counter),

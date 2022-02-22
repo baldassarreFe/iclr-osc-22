@@ -222,6 +222,10 @@ def prepare_test_vqa(
 ):
     """Prepare a test example for VQA (center crop+normalization)
 
+    The VQA target is a one-hot encoding of all possible questions like
+    "is there at least one (size, color, material, shape) object in the scene?".
+    There are 2 sizes, 8 colors, 2 materials and 3 shapes, so 96 binary values.
+
     Args:
         example:
         img_size: image size ``(H, W)``
@@ -230,18 +234,19 @@ def prepare_test_vqa(
         std: image standard deviation for normalization
 
     Returns:
-        A dict containing the image ``[3 H W]`` and the vqa_target ``[V]``
+        A dict containing the image ``[3 H W]`` and the VQA target ``[V]``.
+
     """
     # image: [H W 3]
     image = example["image"]
 
+    # Crop a square from the center
     H, W = img_size
     S = min(H, W)
     y0 = (H - S) // 2
     x0 = (W - S) // 2
     y1 = (H + S) // 2
     x1 = (W + S) // 2
-
     image = image[y0:y1, x0:x1, :]
 
     image = tf.image.convert_image_dtype(image, tf.float32)
@@ -249,9 +254,22 @@ def prepare_test_vqa(
     image = tf.image.resize(image, crop_size)
     image = tf.transpose(image, [2, 0, 1])
 
-    eight = tf.constant([1, 2, 3, 4, 5, 6, 7, 8], dtype=tf.uint8)
-    color = tf.reduce_any(example["color"][None, :] == eight[:, None], axis=1)
-    vqa_target = color
+    # First object is always background, so slice [1:]
+    # Background and non-existing objects have a value of 0 for all attributes,
+    # so subtract 1 to shift all attributes in a [0, x] range
+    size = example["size"][example["visibility"]][1:] - 1
+    color = example["color"][example["visibility"]][1:] - 1
+    material = example["material"][example["visibility"]][1:] - 1
+    shape = example["shape"][example["visibility"]][1:] - 1
+
+    # Count how many objects of each type
+    # counts_nd: [size, color, material, shape]
+    counts_nd = tf.scatter_nd(
+        tf.cast(tf.stack([size, color, material, shape], axis=1), tf.int32),
+        tf.ones_like(size),
+        (2, 8, 2, 3),
+    )
+    vqa_target = tf.reshape(counts_nd > 0, (2 * 8 * 2 * 3,))
 
     return {"image": image, "vqa_target": vqa_target}
 
