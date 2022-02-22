@@ -15,6 +15,7 @@ EXCLUDE_HPARAMS = (
     "data.val.seed",
     "other",
     "logging",
+    "training.checkpoint_interval",
 )
 
 
