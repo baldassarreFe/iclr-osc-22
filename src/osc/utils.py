@@ -182,6 +182,37 @@ def fill_diagonal_(x: Tensor, value: float = -torch.inf) -> Tensor:
     return x.masked_fill_(mask, value)
 
 
+@tf.function
+def ravel_multi_index_tf(
+    multi_index: Tuple[tf.Tensor, ...], dims: Tuple[int, ...]
+) -> tf.Tensor:
+    """Same as :func:``np.ravel_multi_index`` with no checks.
+
+    Args:
+        multi_index: a tuple of index tensors, one per dimension
+        dims: the shape of the tensor. The number of dimensions should be the same
+            as the number of index tensors in ``multi_index``.
+            Also, ``all(multi_index[i] < dims[i])`` is expected to hold for all ``i``.
+
+    Example:
+        How to use::
+
+        >>> ravel_multi_index_tf((
+        >>>     tf.constant([4, 3, 3, 2]),
+        >>>     tf.constant([0, 1, 5, 6]),
+        >>>     tf.constant([0, 1, 2, 0]),
+        >>> ), (5, 7, 3))
+        [84, 67, 80, 60]
+
+    Returns:
+        A 1D tensor of flat indexes.
+    """
+    strides = tf.math.cumprod(tf.constant([*dims, 1]), reverse=True)[1:]
+    multi_index = tf.stack(multi_index, axis=0)
+    result = multi_index * strides[:, None]
+    return tf.reduce_sum(result, axis=0)
+
+
 class SigIntCatcher(AbstractContextManager):
     """Context manager to gracefully handle SIGINT or KeyboardInterrupt.
 
