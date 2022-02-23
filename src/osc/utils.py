@@ -8,7 +8,7 @@ import random
 import signal
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import tabulate
@@ -211,6 +211,38 @@ def ravel_multi_index_tf(
     multi_index = tf.stack(multi_index, axis=0)
     result = multi_index * strides[:, None]
     return tf.reduce_sum(result, axis=0)
+
+
+StringDict = Mapping[str, Union[Any, "StringDict"]]
+
+
+def to_dotlist(
+    d: StringDict, prf: Tuple[str, ...] = tuple()
+) -> Iterator[Tuple[str, Any]]:
+    """Iterate over a flattened dict using dot-separated keys.
+
+    Args:
+        d: a hierarchical dictionary with strings as keys
+        prf: tuple of prefixes used for recursion
+
+    Examples:
+        Flatten a dict::
+
+        >>> print(*to_dotlist({'a': {'b': {}, 'c': 1, 'd': [2]}, 'x': []}), sep="\\n")
+        ('a.b', {})
+        ('a.c', 1)
+        ('a.d', [2])
+        ('x', [])
+
+    Yields:
+        Tuples of dot-separated keys and values. Call :func:``dict`` on the returned
+        iterator to build a flat dict.
+    """
+    for k, v in d.items():
+        if isinstance(v, dict) and len(v) > 0:
+            yield from to_dotlist(v, prf=(*prf, k))
+        else:
+            yield ".".join((*prf, k)), v
 
 
 class SigIntCatcher(AbstractContextManager):
