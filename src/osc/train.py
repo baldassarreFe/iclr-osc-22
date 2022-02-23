@@ -1681,28 +1681,40 @@ def run_test_linear_probes(
         fig.set_facecolor("white")
         wandb_imgs[plot_name] = wandb.Image(fig)
 
-    ap = average_precision_score(
+    ap_balanced = average_precision_score(
         y_true=targets_test.flatten(),
         y_score=preds.flatten(),
         sample_weight=sample_weight,
     )
-    auroc = roc_auc_score(
+    ap_imbalanced = average_precision_score(
+        y_true=targets_test.flatten(),
+        y_score=preds.flatten(),
+        sample_weight=None,
+    )
+    auroc_balanced = roc_auc_score(
         y_true=targets_test.flatten(),
         y_score=preds.flatten(),
         sample_weight=sample_weight,
+    )
+    auroc_imbalanced = roc_auc_score(
+        y_true=targets_test.flatten(),
+        y_score=preds.flatten(),
+        sample_weight=None,
     )
 
     log.info(
         "VQA: loss %.3f, average precision %.2f, auroc %.2f",
         loss_test,
-        100 * ap,
-        100 * auroc,
+        100 * ap_balanced,
+        100 * auroc_balanced,
     )
     wandb.log(
         {
             "vqa/loss": loss_test,
-            "vqa/ap": ap,
-            "vqa/auroc": auroc,
+            "vqa/ap": ap_balanced,
+            "vqa/ap/imbalanced": ap_imbalanced,
+            "vqa/auroc": auroc_balanced,
+            "vqa/auroc/imbalanced": auroc_imbalanced,
             **wandb_imgs,
         },
         commit=False,
