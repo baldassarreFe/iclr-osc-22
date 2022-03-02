@@ -1,0 +1,31 @@
+osc.viz.segmentation
+====================
+
+.. automodule:: osc.viz.segmentation
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      match_segmentation_masks
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

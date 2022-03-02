@@ -1,0 +1,6 @@
+osc.utils.ravel\_multi\_index\_tf
+=================================
+
+.. currentmodule:: osc.utils
+
+.. autofunction:: ravel_multi_index_tf

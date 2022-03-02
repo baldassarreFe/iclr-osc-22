@@ -1,0 +1,6 @@
+osc.viz.loss\_global.viz\_contrastive\_loss\_global
+===================================================
+
+.. currentmodule:: osc.viz.loss_global
+
+.. autofunction:: viz_contrastive_loss_global

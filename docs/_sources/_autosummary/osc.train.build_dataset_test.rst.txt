@@ -1,0 +1,6 @@
+osc.train.build\_dataset\_test
+==============================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: build_dataset_test

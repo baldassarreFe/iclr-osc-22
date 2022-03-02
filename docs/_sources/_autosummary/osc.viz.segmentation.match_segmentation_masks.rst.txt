@@ -1,0 +1,6 @@
+osc.viz.segmentation.match\_segmentation\_masks
+===============================================
+
+.. currentmodule:: osc.viz.segmentation
+
+.. autofunction:: match_segmentation_masks

@@ -1,0 +1,6 @@
+osc.utils.seed\_everything
+==========================
+
+.. currentmodule:: osc.utils
+
+.. autofunction:: seed_everything

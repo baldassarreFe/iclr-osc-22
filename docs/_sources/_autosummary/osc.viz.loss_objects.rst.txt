@@ -1,0 +1,33 @@
+osc.viz.loss\_objects
+=====================
+
+.. automodule:: osc.viz.loss_objects
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      match_objects
+      viz_contrastive_loss_objects
+      viz_contrastive_loss_objects_probs
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

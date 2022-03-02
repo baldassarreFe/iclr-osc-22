@@ -1,0 +1,6 @@
+osc.train.build\_dataset\_vqa
+=============================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: build_dataset_vqa

@@ -1,0 +1,6 @@
+osc.viz.attentions.viz\_vit\_attns
+==================================
+
+.. currentmodule:: osc.viz.attentions
+
+.. autofunction:: viz_vit_attns

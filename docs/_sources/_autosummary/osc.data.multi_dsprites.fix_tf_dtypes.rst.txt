@@ -1,0 +1,6 @@
+osc.data.multi\_dsprites.fix\_tf\_dtypes
+========================================
+
+.. currentmodule:: osc.data.multi_dsprites
+
+.. autofunction:: fix_tf_dtypes

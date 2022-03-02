@@ -1,0 +1,71 @@
+﻿osc.models.attentions.SlotAttention
+===================================
+
+.. currentmodule:: osc.models.attentions
+
+.. autoclass:: SlotAttention
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~SlotAttention.add_module
+      ~SlotAttention.apply
+      ~SlotAttention.bfloat16
+      ~SlotAttention.buffers
+      ~SlotAttention.children
+      ~SlotAttention.cpu
+      ~SlotAttention.cuda
+      ~SlotAttention.double
+      ~SlotAttention.eval
+      ~SlotAttention.extra_repr
+      ~SlotAttention.float
+      ~SlotAttention.forward
+      ~SlotAttention.get_buffer
+      ~SlotAttention.get_extra_state
+      ~SlotAttention.get_parameter
+      ~SlotAttention.get_submodule
+      ~SlotAttention.half
+      ~SlotAttention.load_state_dict
+      ~SlotAttention.modules
+      ~SlotAttention.named_buffers
+      ~SlotAttention.named_children
+      ~SlotAttention.named_modules
+      ~SlotAttention.named_parameters
+      ~SlotAttention.parameters
+      ~SlotAttention.register_backward_hook
+      ~SlotAttention.register_buffer
+      ~SlotAttention.register_forward_hook
+      ~SlotAttention.register_forward_pre_hook
+      ~SlotAttention.register_full_backward_hook
+      ~SlotAttention.register_parameter
+      ~SlotAttention.requires_grad_
+      ~SlotAttention.set_extra_state
+      ~SlotAttention.share_memory
+      ~SlotAttention.state_dict
+      ~SlotAttention.to
+      ~SlotAttention.to_empty
+      ~SlotAttention.train
+      ~SlotAttention.type
+      ~SlotAttention.xpu
+      ~SlotAttention.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~SlotAttention.T_destination
+        ~SlotAttention.dump_patches
+   
+   

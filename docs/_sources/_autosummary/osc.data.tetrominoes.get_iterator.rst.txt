@@ -1,0 +1,6 @@
+osc.data.tetrominoes.get\_iterator
+==================================
+
+.. currentmodule:: osc.data.tetrominoes
+
+.. autofunction:: get_iterator

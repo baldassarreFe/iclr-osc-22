@@ -1,0 +1,6 @@
+osc.utils.latest\_checkpoint
+============================
+
+.. currentmodule:: osc.utils
+
+.. autofunction:: latest_checkpoint

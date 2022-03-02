@@ -1,0 +1,6 @@
+osc.train.run\_test\_segmentation
+=================================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: run_test_segmentation

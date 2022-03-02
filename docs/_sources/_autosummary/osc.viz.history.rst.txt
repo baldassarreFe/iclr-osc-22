@@ -1,0 +1,32 @@
+osc.viz.history
+===============
+
+.. automodule:: osc.viz.history
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      history_groupby_name
+      viz_history
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

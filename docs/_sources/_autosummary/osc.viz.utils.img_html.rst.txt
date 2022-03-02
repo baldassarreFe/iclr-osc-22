@@ -1,0 +1,6 @@
+osc.viz.utils.img\_html
+=======================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: img_html

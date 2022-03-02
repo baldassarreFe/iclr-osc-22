@@ -1,0 +1,6 @@
+osc.data.tfrecords.deserialize\_image\_and\_mask
+================================================
+
+.. currentmodule:: osc.data.tfrecords
+
+.. autofunction:: deserialize_image_and_mask

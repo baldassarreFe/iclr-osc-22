@@ -1,0 +1,72 @@
+﻿osc.models.embeds.LearnedObjectTokens
+=====================================
+
+.. currentmodule:: osc.models.embeds
+
+.. autoclass:: LearnedObjectTokens
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~LearnedObjectTokens.add_module
+      ~LearnedObjectTokens.apply
+      ~LearnedObjectTokens.bfloat16
+      ~LearnedObjectTokens.buffers
+      ~LearnedObjectTokens.children
+      ~LearnedObjectTokens.cpu
+      ~LearnedObjectTokens.cuda
+      ~LearnedObjectTokens.double
+      ~LearnedObjectTokens.eval
+      ~LearnedObjectTokens.extra_repr
+      ~LearnedObjectTokens.float
+      ~LearnedObjectTokens.forward
+      ~LearnedObjectTokens.get_buffer
+      ~LearnedObjectTokens.get_extra_state
+      ~LearnedObjectTokens.get_parameter
+      ~LearnedObjectTokens.get_submodule
+      ~LearnedObjectTokens.half
+      ~LearnedObjectTokens.init_weights
+      ~LearnedObjectTokens.load_state_dict
+      ~LearnedObjectTokens.modules
+      ~LearnedObjectTokens.named_buffers
+      ~LearnedObjectTokens.named_children
+      ~LearnedObjectTokens.named_modules
+      ~LearnedObjectTokens.named_parameters
+      ~LearnedObjectTokens.parameters
+      ~LearnedObjectTokens.register_backward_hook
+      ~LearnedObjectTokens.register_buffer
+      ~LearnedObjectTokens.register_forward_hook
+      ~LearnedObjectTokens.register_forward_pre_hook
+      ~LearnedObjectTokens.register_full_backward_hook
+      ~LearnedObjectTokens.register_parameter
+      ~LearnedObjectTokens.requires_grad_
+      ~LearnedObjectTokens.set_extra_state
+      ~LearnedObjectTokens.share_memory
+      ~LearnedObjectTokens.state_dict
+      ~LearnedObjectTokens.to
+      ~LearnedObjectTokens.to_empty
+      ~LearnedObjectTokens.train
+      ~LearnedObjectTokens.type
+      ~LearnedObjectTokens.xpu
+      ~LearnedObjectTokens.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~LearnedObjectTokens.T_destination
+        ~LearnedObjectTokens.dump_patches
+   
+   

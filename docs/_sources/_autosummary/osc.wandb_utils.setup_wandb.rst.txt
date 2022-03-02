@@ -1,0 +1,6 @@
+osc.wandb\_utils.setup\_wandb
+=============================
+
+.. currentmodule:: osc.wandb_utils
+
+.. autofunction:: setup_wandb

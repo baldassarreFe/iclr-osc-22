@@ -1,0 +1,6 @@
+osc.data.random\_resized\_crop.random\_resized\_crop
+====================================================
+
+.. currentmodule:: osc.data.random_resized_crop
+
+.. autofunction:: random_resized_crop

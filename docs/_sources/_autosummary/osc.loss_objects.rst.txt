@@ -1,0 +1,34 @@
+osc.loss\_objects
+=================
+
+.. automodule:: osc.loss_objects
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      matching_contrastive_loss
+      matching_contrastive_loss_best_worst
+      matching_contrastive_loss_per_img
+      matching_similarity_loss_per_img
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

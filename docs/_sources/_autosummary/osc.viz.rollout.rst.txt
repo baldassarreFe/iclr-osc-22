@@ -1,0 +1,33 @@
+osc.viz.rollout
+===============
+
+.. automodule:: osc.viz.rollout
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      cross_attn_rollout
+      self_attn_rollout
+      slot_attn_rollout
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

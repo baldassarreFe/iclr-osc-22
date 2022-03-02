@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>osc.utils.to_dotlist &mdash; ICLR OSC 2022 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="osc.utils.AverageMetric" href="osc.utils.AverageMetric.html" />
+    <link rel="prev" title="osc.utils.seed_everything" href="osc.utils.seed_everything.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> ICLR OSC 2022
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="osc.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="osc.data.html">osc.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_global.html">osc.loss_global</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_objects.html">osc.loss_objects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.lr_scheduler.html">osc.lr_scheduler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.models.html">osc.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.train.html">osc.train</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="osc.utils.html">osc.utils</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.batches_per_epoch.html">osc.utils.batches_per_epoch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.fill_diagonal_.html">osc.utils.fill_diagonal_</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.latest_checkpoint.html">osc.utils.latest_checkpoint</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.print_arrays.html">osc.utils.print_arrays</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.ravel_multi_index_tf.html">osc.utils.ravel_multi_index_tf</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.seed_everything.html">osc.utils.seed_everything</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">osc.utils.to_dotlist</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.AverageMetric.html">osc.utils.AverageMetric</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.SigIntCatcher.html">osc.utils.SigIntCatcher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.utils.StepCounter.html">osc.utils.StepCounter</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="osc.viz.html">osc.viz</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.wandb_utils.html">osc.wandb_utils</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ICLR OSC 2022</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="osc.html">osc</a> &raquo;</li>
+          <li><a href="osc.utils.html">osc.utils</a> &raquo;</li>
+      <li>osc.utils.to_dotlist</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/osc.utils.to_dotlist.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="osc-utils-to-dotlist">
+<h1>osc.utils.to_dotlist<a class="headerlink" href="#osc-utils-to-dotlist" title="Permalink to this headline"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="osc.utils.to_dotlist">
+<span class="sig-name descname"><span class="pre">to_dotlist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prf</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/osc/utils.html#to_dotlist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#osc.utils.to_dotlist" title="Permalink to this definition"></a></dt>
+<dd><p>Iterate over a flattened dict using dot-separated keys.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>d</strong> – a hierarchical dictionary with strings as keys</p></li>
+<li><p><strong>prf</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.10)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#Ellipsis" title="(in Python v3.10)"><code class="xref py py-data docutils literal notranslate"><span class="pre">...</span></code></a>]) – tuple of prefixes used for recursion</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The type of <code class="docutils literal notranslate"><span class="pre">d</span></code> can be defined as <code class="docutils literal notranslate"><span class="pre">StringDict</span></code>, but it clashes with Sphynx:
+<code class="docutils literal notranslate"><span class="pre">StringDict</span> <span class="pre">=</span> <span class="pre">Mapping[str,</span> <span class="pre">Union[Any,</span> <span class="pre">StringDict]]</span></code>.</p>
+<p class="rubric">Examples</p>
+<p>Flatten a dict:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">to_dotlist</span><span class="p">({</span><span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="p">{},</span> <span class="s1">&#39;c&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;d&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">]},</span> <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="p">[]}),</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="go">(&#39;a.b&#39;, {})</span>
+<span class="go">(&#39;a.c&#39;, 1)</span>
+<span class="go">(&#39;a.d&#39;, [2])</span>
+<span class="go">(&#39;x&#39;, [])</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Yields</dt>
+<dd class="field-odd"><p>Tuples of dot-separated keys and values. Call :func:<code class="docutils literal notranslate"><span class="pre">dict</span></code> on the returned
+iterator to build a flat dict.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterator" title="(in Python v3.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterator</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.10)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.10)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="osc.utils.seed_everything.html" class="btn btn-neutral float-left" title="osc.utils.seed_everything" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="osc.utils.AverageMetric.html" class="btn btn-neutral float-right" title="osc.utils.AverageMetric" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Federico Baldassarre.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

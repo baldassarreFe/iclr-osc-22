@@ -1,0 +1,6 @@
+osc.train.main
+==============
+
+.. currentmodule:: osc.train
+
+.. autofunction:: main

@@ -1,0 +1,6 @@
+osc.data.objects\_room.fix\_tf\_dtypes
+======================================
+
+.. currentmodule:: osc.data.objects_room
+
+.. autofunction:: fix_tf_dtypes

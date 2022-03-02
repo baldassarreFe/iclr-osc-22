@@ -1,0 +1,6 @@
+osc.viz.history.viz\_history
+============================
+
+.. currentmodule:: osc.viz.history
+
+.. autofunction:: viz_history

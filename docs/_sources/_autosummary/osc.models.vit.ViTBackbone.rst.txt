@@ -1,0 +1,72 @@
+﻿osc.models.vit.ViTBackbone
+==========================
+
+.. currentmodule:: osc.models.vit
+
+.. autoclass:: ViTBackbone
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~ViTBackbone.add_module
+      ~ViTBackbone.apply
+      ~ViTBackbone.bfloat16
+      ~ViTBackbone.buffers
+      ~ViTBackbone.children
+      ~ViTBackbone.cpu
+      ~ViTBackbone.cuda
+      ~ViTBackbone.double
+      ~ViTBackbone.eval
+      ~ViTBackbone.extra_repr
+      ~ViTBackbone.float
+      ~ViTBackbone.forward
+      ~ViTBackbone.get_buffer
+      ~ViTBackbone.get_extra_state
+      ~ViTBackbone.get_parameter
+      ~ViTBackbone.get_submodule
+      ~ViTBackbone.half
+      ~ViTBackbone.init_weights
+      ~ViTBackbone.load_state_dict
+      ~ViTBackbone.modules
+      ~ViTBackbone.named_buffers
+      ~ViTBackbone.named_children
+      ~ViTBackbone.named_modules
+      ~ViTBackbone.named_parameters
+      ~ViTBackbone.parameters
+      ~ViTBackbone.register_backward_hook
+      ~ViTBackbone.register_buffer
+      ~ViTBackbone.register_forward_hook
+      ~ViTBackbone.register_forward_pre_hook
+      ~ViTBackbone.register_full_backward_hook
+      ~ViTBackbone.register_parameter
+      ~ViTBackbone.requires_grad_
+      ~ViTBackbone.set_extra_state
+      ~ViTBackbone.share_memory
+      ~ViTBackbone.state_dict
+      ~ViTBackbone.to
+      ~ViTBackbone.to_empty
+      ~ViTBackbone.train
+      ~ViTBackbone.type
+      ~ViTBackbone.xpu
+      ~ViTBackbone.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~ViTBackbone.T_destination
+        ~ViTBackbone.dump_patches
+   
+   

@@ -1,0 +1,6 @@
+osc.viz.utils.array\_to\_pil
+============================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: array_to_pil

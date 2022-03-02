@@ -1,0 +1,34 @@
+osc.models
+==========
+
+.. automodule:: osc.models
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. autosummary::
+   :toctree:
+   :template: custom-module-template.rst
+   :recursive:
+
+   osc.models.attentions
+   osc.models.embeds
+   osc.models.models
+   osc.models.utils
+   osc.models.vit
+

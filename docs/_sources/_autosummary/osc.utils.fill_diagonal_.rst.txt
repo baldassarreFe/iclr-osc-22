@@ -1,0 +1,6 @@
+osc.utils.fill\_diagonal\_
+==========================
+
+.. currentmodule:: osc.utils
+
+.. autofunction:: fill_diagonal_

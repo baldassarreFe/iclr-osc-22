@@ -1,0 +1,34 @@
+osc.data.tfrecords
+==================
+
+.. automodule:: osc.data.tfrecords
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      deserialize_image
+      deserialize_image_and_mask
+      serialize_image
+      serialize_image_and_mask
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

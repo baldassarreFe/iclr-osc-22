@@ -1,0 +1,6 @@
+osc.utils.print\_arrays
+=======================
+
+.. currentmodule:: osc.utils
+
+.. autofunction:: print_arrays

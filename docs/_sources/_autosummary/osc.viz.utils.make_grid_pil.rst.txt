@@ -1,0 +1,6 @@
+osc.viz.utils.make\_grid\_pil
+=============================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: make_grid_pil

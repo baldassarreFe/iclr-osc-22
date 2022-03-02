@@ -1,0 +1,6 @@
+osc.utils.to\_dotlist
+=====================
+
+.. currentmodule:: osc.utils
+
+.. autofunction:: to_dotlist

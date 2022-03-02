@@ -1,0 +1,6 @@
+osc.data.utils.augment\_twice
+=============================
+
+.. currentmodule:: osc.data.utils
+
+.. autofunction:: augment_twice

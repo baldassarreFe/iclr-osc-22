@@ -1,0 +1,6 @@
+osc.data.tfrecords.deserialize\_image
+=====================================
+
+.. currentmodule:: osc.data.tfrecords
+
+.. autofunction:: deserialize_image

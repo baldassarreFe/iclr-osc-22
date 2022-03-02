@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>osc.data.utils &mdash; ICLR OSC 2022 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> ICLR OSC 2022
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../setup.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/osc.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ICLR OSC 2022</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>osc.data.utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for osc.data.utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helper functions to bridge tensorflow image data to pytorch.</span>
+
+<span class="sd">Functions:</span>
+
+<span class="sd">- Image normalization back and forth</span>
+<span class="sd">- Augmentation</span>
+
+<span class="sd">    - Augmentations with &#39;&#39;stateless&#39;&#39; random seeds</span>
+<span class="sd">    - Fixed augmentations</span>
+<span class="sd">    - Double augmentation for contrastive training</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Protocol</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span>
+<span class="kn">import</span> <span class="nn">torch.utils.data</span>
+
+<span class="kn">from</span> <span class="nn">osc.utils</span> <span class="kn">import</span> <span class="n">ImgMean</span><span class="p">,</span> <span class="n">ImgSizeHW</span><span class="p">,</span> <span class="n">ImgStd</span>
+
+<span class="kn">from</span> <span class="nn">.random_resized_crop</span> <span class="kn">import</span> <span class="n">random_resized_crop</span>
+
+
+<div class="viewcode-block" id="normalize_tf"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.normalize_tf.html#osc.data.utils.normalize_tf">[docs]</a><span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+<span class="k">def</span> <span class="nf">normalize_tf</span><span class="p">(</span><span class="n">img</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mean</span><span class="p">:</span> <span class="n">ImgMean</span><span class="p">,</span> <span class="n">std</span><span class="p">:</span> <span class="n">ImgStd</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Normalize tf.float32 image with [..., H, W, C] channel order.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        img: tf.float32 of shape [..., H, W, C]</span>
+<span class="sd">        mean: tuple of floats shape [C]</span>
+<span class="sd">        std: tuple of floats shape [C]</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Normalized image.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mean</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">convert_to_tensor</span><span class="p">(</span><span class="n">mean</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">convert_to_tensor</span><span class="p">(</span><span class="n">std</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">img</span> <span class="o">-</span> <span class="n">mean</span><span class="p">)</span> <span class="o">/</span> <span class="n">std</span></div>
+
+
+<div class="viewcode-block" id="unnormalize_pt"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.unnormalize_pt.html#osc.data.utils.unnormalize_pt">[docs]</a><span class="k">def</span> <span class="nf">unnormalize_pt</span><span class="p">(</span><span class="n">img</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mean</span><span class="p">:</span> <span class="n">ImgMean</span><span class="p">,</span> <span class="n">std</span><span class="p">:</span> <span class="n">ImgStd</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Un-normalize torch.float32 image with [..., C, H, W] channel order.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        img: torch.float32 of shape [..., C, H, W]</span>
+<span class="sd">        mean: tuple of floats shape [C]</span>
+<span class="sd">        std: tuple of floats shape [C]</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Un-normalized image with values in range [0, 1].</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mean</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">mean</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">std</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">img</span> <span class="o">*</span> <span class="n">std</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">mean</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="img_hwc_to_chw"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.img_hwc_to_chw.html#osc.data.utils.img_hwc_to_chw">[docs]</a><span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+<span class="k">def</span> <span class="nf">img_hwc_to_chw</span><span class="p">(</span><span class="n">img</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Image channels [..., H, W, C] -&gt; [..., C, H, W]&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">tf</span><span class="o">.</span><span class="n">experimental</span><span class="o">.</span><span class="n">numpy</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="augment_train"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.augment_train.html#osc.data.utils.augment_train">[docs]</a><span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+<span class="k">def</span> <span class="nf">augment_train</span><span class="p">(</span>
+    <span class="n">img</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">crop_size</span><span class="p">:</span> <span class="n">ImgSizeHW</span><span class="p">,</span>
+    <span class="n">crop_scale</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+    <span class="n">mean</span><span class="p">:</span> <span class="n">ImgMean</span><span class="p">,</span>
+    <span class="n">std</span><span class="p">:</span> <span class="n">ImgStd</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Augment image for train/val. Pass different seeds to get different augmentations.</span>
+
+<span class="sd">    Augmentations applied:</span>
+
+<span class="sd">    - uint8 [0-255] -&gt; float32 [0-1]</span>
+<span class="sd">    - random flip</span>
+<span class="sd">    - random resized crop (random aspect ratio, zoom factor, resize to ``crop_size``)</span>
+<span class="sd">    - color jitter (brightness, saturation, hue)</span>
+<span class="sd">    - normalization to given ``mean`` and ``std``</span>
+<span class="sd">    - pytorch channel order [H W C] -&gt; [C H W]</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        img: tf.uint8 tensor</span>
+<span class="sd">        seed: random seed used as base seed for all transformations</span>
+<span class="sd">        crop_size: size of the image after cropping</span>
+<span class="sd">        crop_scale: minimum and maximum crop scale for example ``(0.3, 1.0)``</span>
+<span class="sd">        mean: image mean for normalization</span>
+<span class="sd">        std: image std for normalization</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">convert_image_dtype</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">tf</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+    <span class="n">seeds</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">experimental</span><span class="o">.</span><span class="n">stateless_split</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="n">num</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">stateless_random_flip_left_right</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">seeds</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">random_resized_crop</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">crop_size</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">crop_scale</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seeds</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">stateless_random_brightness</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="n">seeds</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">stateless_random_saturation</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">seeds</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">stateless_random_hue</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">seeds</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+
+    <span class="n">img</span> <span class="o">=</span> <span class="n">normalize_tf</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="p">)</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">img_hwc_to_chw</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">img</span></div>
+
+
+<div class="viewcode-block" id="augment_center_crop"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.augment_center_crop.html#osc.data.utils.augment_center_crop">[docs]</a><span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+<span class="k">def</span> <span class="nf">augment_center_crop</span><span class="p">(</span>
+    <span class="n">img</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">crop</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">img_size</span><span class="p">:</span> <span class="n">ImgSizeHW</span><span class="p">,</span> <span class="n">mean</span><span class="p">:</span> <span class="n">ImgMean</span><span class="p">,</span> <span class="n">std</span><span class="p">:</span> <span class="n">ImgStd</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Deterministic center crop and processing as in :func:`augment_train`</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        img: TF uint8 tensor of shape [H W C]</span>
+<span class="sd">        crop:</span>
+<span class="sd">        img_size:</span>
+<span class="sd">        mean:</span>
+<span class="sd">        std:</span>
+
+<span class="sd">    Returns:</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">convert_image_dtype</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">tf</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">central_crop</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">crop</span><span class="p">)</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">img_size</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;bilinear&quot;</span><span class="p">,</span> <span class="n">antialias</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">img</span> <span class="o">=</span> <span class="n">normalize_tf</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="p">)</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">img_hwc_to_chw</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">img</span></div>
+
+
+<span class="n">AugmentFn</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
+    <span class="p">[</span>
+        <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="augment_twice"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.augment_twice.html#osc.data.utils.augment_twice">[docs]</a><span class="k">def</span> <span class="nf">augment_twice</span><span class="p">(</span><span class="n">augment_fn0</span><span class="p">:</span> <span class="n">AugmentFn</span><span class="p">,</span> <span class="n">augment_fn1</span><span class="p">:</span> <span class="n">AugmentFn</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Augment image twice with two different functions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        augment_fn0: callable, augment_fn0(img)</span>
+<span class="sd">        augment_fn1: callable, augment_fn1(img)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Callable, augment_twice(fn0, fn1)(img) -&gt; (fn0(img), fn1(img))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+    <span class="k">def</span> <span class="nf">twice</span><span class="p">(</span><span class="n">img</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">augment_fn0</span><span class="p">(</span><span class="n">img</span><span class="p">),</span> <span class="n">augment_fn1</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">twice</span></div>
+
+
+<div class="viewcode-block" id="AugmentFnStateless"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.AugmentFnStateless.html#osc.data.utils.AugmentFnStateless">[docs]</a><span class="k">class</span> <span class="nc">AugmentFnStateless</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Function type signature for TF stateless random.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AugmentFnStateless.__call__"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.AugmentFnStateless.html#osc.data.utils.AugmentFnStateless.__call__">[docs]</a>    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="o">...</span></div></div>
+
+
+<div class="viewcode-block" id="wrap_with_seed"><a class="viewcode-back" href="../../../_autosummary/osc.data.utils.wrap_with_seed.html#osc.data.utils.wrap_with_seed">[docs]</a><span class="k">def</span> <span class="nf">wrap_with_seed</span><span class="p">(</span>
+    <span class="n">augment_fn</span><span class="p">:</span> <span class="n">AugmentFnStateless</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">initial_seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AugmentFn</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Wrap stateless random functions by providing a new seed to each invocation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        augment_fn: callable, augment_fn(img, seed)</span>
+<span class="sd">        initial_seed: initial seed for the generator.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Callable that wraps ``augment_fn``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rng</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="o">.</span><span class="n">from_seed</span><span class="p">(</span><span class="n">initial_seed</span><span class="p">)</span>
+
+    <span class="nd">@tf</span><span class="o">.</span><span class="n">function</span>
+    <span class="k">def</span> <span class="nf">wrapped</span><span class="p">(</span><span class="n">img</span><span class="p">:</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">tf</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="n">seed</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">make_seeds</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="mi">1</span><span class="p">)[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">augment_fn</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">wrapped</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Federico Baldassarre.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

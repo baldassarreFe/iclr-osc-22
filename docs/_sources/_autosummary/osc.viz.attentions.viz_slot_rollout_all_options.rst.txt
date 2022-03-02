@@ -1,0 +1,6 @@
+osc.viz.attentions.viz\_slot\_rollout\_all\_options
+===================================================
+
+.. currentmodule:: osc.viz.attentions
+
+.. autofunction:: viz_slot_rollout_all_options

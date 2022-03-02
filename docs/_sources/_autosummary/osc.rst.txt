@@ -1,0 +1,38 @@
+﻿osc
+===
+
+.. automodule:: osc
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. autosummary::
+   :toctree:
+   :template: custom-module-template.rst
+   :recursive:
+
+   osc.data
+   osc.loss_global
+   osc.loss_objects
+   osc.lr_scheduler
+   osc.models
+   osc.train
+   osc.utils
+   osc.viz
+   osc.wandb_utils
+

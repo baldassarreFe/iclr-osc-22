@@ -1,0 +1,6 @@
+osc.train.build\_model
+======================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: build_model

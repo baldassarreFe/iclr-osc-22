@@ -1,0 +1,36 @@
+osc.data.clevr\_with\_masks
+===========================
+
+.. automodule:: osc.data.clevr_with_masks
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      fix_tf_dtypes
+      get_iterator
+      main
+      prepare_test_segmentation
+      prepare_test_vqa
+      show_sample
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

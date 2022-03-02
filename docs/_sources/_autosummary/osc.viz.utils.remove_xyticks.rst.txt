@@ -1,0 +1,6 @@
+osc.viz.utils.remove\_xyticks
+=============================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: remove_xyticks

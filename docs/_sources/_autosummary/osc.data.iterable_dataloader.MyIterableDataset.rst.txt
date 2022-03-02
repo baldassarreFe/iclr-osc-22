@@ -1,0 +1,36 @@
+﻿osc.data.iterable\_dataloader.MyIterableDataset
+===============================================
+
+.. currentmodule:: osc.data.iterable_dataloader
+
+.. autoclass:: MyIterableDataset
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~MyIterableDataset.register_datapipe_as_function
+      ~MyIterableDataset.register_function
+      ~MyIterableDataset.reinforce_type
+      ~MyIterableDataset.set_reduce_ex_hook
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~MyIterableDataset.functions
+        ~MyIterableDataset.reduce_ex_hook
+        ~MyIterableDataset.type
+   
+   

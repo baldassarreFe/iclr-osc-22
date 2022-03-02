@@ -1,0 +1,6 @@
+osc.data.utils.normalize\_tf
+============================
+
+.. currentmodule:: osc.data.utils
+
+.. autofunction:: normalize_tf

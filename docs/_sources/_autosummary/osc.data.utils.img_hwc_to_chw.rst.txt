@@ -1,0 +1,6 @@
+osc.data.utils.img\_hwc\_to\_chw
+================================
+
+.. currentmodule:: osc.data.utils
+
+.. autofunction:: img_hwc_to_chw

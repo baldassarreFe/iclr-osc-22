@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>osc.viz &mdash; ICLR OSC 2022 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="osc.viz.attentions" href="osc.viz.attentions.html" />
+    <link rel="prev" title="osc.utils.StepCounter" href="osc.utils.StepCounter.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> ICLR OSC 2022
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="osc.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="osc.data.html">osc.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_global.html">osc.loss_global</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_objects.html">osc.loss_objects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.lr_scheduler.html">osc.lr_scheduler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.models.html">osc.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.train.html">osc.train</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.utils.html">osc.utils</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">osc.viz</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.attentions.html">osc.viz.attentions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.backbone.html">osc.viz.backbone</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.embeds.html">osc.viz.embeds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.history.html">osc.viz.history</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.loss_global.html">osc.viz.loss_global</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.loss_objects.html">osc.viz.loss_objects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.rollout.html">osc.viz.rollout</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.segmentation.html">osc.viz.segmentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.viz.utils.html">osc.viz.utils</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="osc.wandb_utils.html">osc.wandb_utils</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ICLR OSC 2022</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="osc.html">osc</a> &raquo;</li>
+      <li>osc.viz</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/osc.viz.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-osc.viz">
+<span id="osc-viz"></span><h1>osc.viz<a class="headerlink" href="#module-osc.viz" title="Permalink to this headline"></a></h1>
+<p>Visualization utils.</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.viz.attentions.html#module-osc.viz.attentions" title="osc.viz.attentions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.attentions</span></code></a></p></td>
+<td><p>Attention visualization utils: single attn maps and rollouts.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="osc.viz.backbone.html#module-osc.viz.backbone" title="osc.viz.backbone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.backbone</span></code></a></p></td>
+<td><p>Clustering backbone features.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.viz.embeds.html#module-osc.viz.embeds" title="osc.viz.embeds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.embeds</span></code></a></p></td>
+<td><p>Visualization of positional embeddings.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="osc.viz.history.html#module-osc.viz.history" title="osc.viz.history"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.history</span></code></a></p></td>
+<td><p>Visualization of training history (old).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.viz.loss_global.html#module-osc.viz.loss_global" title="osc.viz.loss_global"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.loss_global</span></code></a></p></td>
+<td><p>Visualization of global losses.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="osc.viz.loss_objects.html#module-osc.viz.loss_objects" title="osc.viz.loss_objects"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.loss_objects</span></code></a></p></td>
+<td><p>Visualization of object losses.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.viz.rollout.html#module-osc.viz.rollout" title="osc.viz.rollout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.rollout</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="osc.viz.segmentation.html#module-osc.viz.segmentation" title="osc.viz.segmentation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.segmentation</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.viz.utils.html#module-osc.viz.utils" title="osc.viz.utils"><code class="xref py py-obj docutils literal notranslate"><span class="pre">osc.viz.utils</span></code></a></p></td>
+<td><p>Visualization utils.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="osc.utils.StepCounter.html" class="btn btn-neutral float-left" title="osc.utils.StepCounter" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="osc.viz.attentions.html" class="btn btn-neutral float-right" title="osc.viz.attentions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Federico Baldassarre.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

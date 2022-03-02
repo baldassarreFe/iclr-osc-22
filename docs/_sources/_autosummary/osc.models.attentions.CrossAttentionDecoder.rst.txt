@@ -1,0 +1,72 @@
+﻿osc.models.attentions.CrossAttentionDecoder
+===========================================
+
+.. currentmodule:: osc.models.attentions
+
+.. autoclass:: CrossAttentionDecoder
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~CrossAttentionDecoder.add_module
+      ~CrossAttentionDecoder.apply
+      ~CrossAttentionDecoder.bfloat16
+      ~CrossAttentionDecoder.buffers
+      ~CrossAttentionDecoder.children
+      ~CrossAttentionDecoder.cpu
+      ~CrossAttentionDecoder.cuda
+      ~CrossAttentionDecoder.double
+      ~CrossAttentionDecoder.eval
+      ~CrossAttentionDecoder.extra_repr
+      ~CrossAttentionDecoder.float
+      ~CrossAttentionDecoder.forward
+      ~CrossAttentionDecoder.get_buffer
+      ~CrossAttentionDecoder.get_extra_state
+      ~CrossAttentionDecoder.get_parameter
+      ~CrossAttentionDecoder.get_submodule
+      ~CrossAttentionDecoder.half
+      ~CrossAttentionDecoder.init_weights
+      ~CrossAttentionDecoder.load_state_dict
+      ~CrossAttentionDecoder.modules
+      ~CrossAttentionDecoder.named_buffers
+      ~CrossAttentionDecoder.named_children
+      ~CrossAttentionDecoder.named_modules
+      ~CrossAttentionDecoder.named_parameters
+      ~CrossAttentionDecoder.parameters
+      ~CrossAttentionDecoder.register_backward_hook
+      ~CrossAttentionDecoder.register_buffer
+      ~CrossAttentionDecoder.register_forward_hook
+      ~CrossAttentionDecoder.register_forward_pre_hook
+      ~CrossAttentionDecoder.register_full_backward_hook
+      ~CrossAttentionDecoder.register_parameter
+      ~CrossAttentionDecoder.requires_grad_
+      ~CrossAttentionDecoder.set_extra_state
+      ~CrossAttentionDecoder.share_memory
+      ~CrossAttentionDecoder.state_dict
+      ~CrossAttentionDecoder.to
+      ~CrossAttentionDecoder.to_empty
+      ~CrossAttentionDecoder.train
+      ~CrossAttentionDecoder.type
+      ~CrossAttentionDecoder.xpu
+      ~CrossAttentionDecoder.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~CrossAttentionDecoder.T_destination
+        ~CrossAttentionDecoder.dump_patches
+   
+   

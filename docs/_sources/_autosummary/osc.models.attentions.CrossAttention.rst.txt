@@ -1,0 +1,71 @@
+﻿osc.models.attentions.CrossAttention
+====================================
+
+.. currentmodule:: osc.models.attentions
+
+.. autoclass:: CrossAttention
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~CrossAttention.add_module
+      ~CrossAttention.apply
+      ~CrossAttention.bfloat16
+      ~CrossAttention.buffers
+      ~CrossAttention.children
+      ~CrossAttention.cpu
+      ~CrossAttention.cuda
+      ~CrossAttention.double
+      ~CrossAttention.eval
+      ~CrossAttention.extra_repr
+      ~CrossAttention.float
+      ~CrossAttention.forward
+      ~CrossAttention.get_buffer
+      ~CrossAttention.get_extra_state
+      ~CrossAttention.get_parameter
+      ~CrossAttention.get_submodule
+      ~CrossAttention.half
+      ~CrossAttention.load_state_dict
+      ~CrossAttention.modules
+      ~CrossAttention.named_buffers
+      ~CrossAttention.named_children
+      ~CrossAttention.named_modules
+      ~CrossAttention.named_parameters
+      ~CrossAttention.parameters
+      ~CrossAttention.register_backward_hook
+      ~CrossAttention.register_buffer
+      ~CrossAttention.register_forward_hook
+      ~CrossAttention.register_forward_pre_hook
+      ~CrossAttention.register_full_backward_hook
+      ~CrossAttention.register_parameter
+      ~CrossAttention.requires_grad_
+      ~CrossAttention.set_extra_state
+      ~CrossAttention.share_memory
+      ~CrossAttention.state_dict
+      ~CrossAttention.to
+      ~CrossAttention.to_empty
+      ~CrossAttention.train
+      ~CrossAttention.type
+      ~CrossAttention.xpu
+      ~CrossAttention.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~CrossAttention.T_destination
+        ~CrossAttention.dump_patches
+   
+   

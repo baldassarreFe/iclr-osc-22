@@ -1,0 +1,6 @@
+osc.train.run\_viz
+==================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: run_viz

@@ -1,0 +1,6 @@
+osc.viz.loss\_objects.viz\_contrastive\_loss\_objects\_probs
+============================================================
+
+.. currentmodule:: osc.viz.loss_objects
+
+.. autofunction:: viz_contrastive_loss_objects_probs

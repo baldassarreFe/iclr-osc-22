@@ -1,0 +1,6 @@
+osc.viz.backbone.kmeans\_backbone
+=================================
+
+.. currentmodule:: osc.viz.backbone
+
+.. autofunction:: kmeans_backbone

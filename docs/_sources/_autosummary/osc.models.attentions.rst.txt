@@ -1,0 +1,38 @@
+osc.models.attentions
+=====================
+
+.. automodule:: osc.models.attentions
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      CoAttentionBlock
+      CrossAttention
+      CrossAttentionBlock
+      CrossAttentionDecoder
+      SelfAttention
+      SelfAttentionBlock
+      SlotAttention
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,0 +1,41 @@
+osc.models.models
+=================
+
+.. automodule:: osc.models.models
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      forward_with_attns
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      Model
+      ModelOutput
+   
+   
+
+   
+   
+   
+
+
+

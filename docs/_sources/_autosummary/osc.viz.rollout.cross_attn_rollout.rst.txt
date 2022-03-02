@@ -1,0 +1,6 @@
+osc.viz.rollout.cross\_attn\_rollout
+====================================
+
+.. currentmodule:: osc.viz.rollout
+
+.. autofunction:: cross_attn_rollout

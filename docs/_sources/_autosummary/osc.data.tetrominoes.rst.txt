@@ -1,0 +1,33 @@
+osc.data.tetrominoes
+====================
+
+.. automodule:: osc.data.tetrominoes
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      fix_tf_dtypes
+      get_iterator
+      show_sample
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

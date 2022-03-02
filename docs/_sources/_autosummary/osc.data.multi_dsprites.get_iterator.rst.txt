@@ -1,0 +1,6 @@
+osc.data.multi\_dsprites.get\_iterator
+======================================
+
+.. currentmodule:: osc.data.multi_dsprites
+
+.. autofunction:: get_iterator

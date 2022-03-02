@@ -1,0 +1,6 @@
+osc.train.update\_cfg
+=====================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: update_cfg

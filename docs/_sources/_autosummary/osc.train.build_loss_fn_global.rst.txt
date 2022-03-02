@@ -1,0 +1,6 @@
+osc.train.build\_loss\_fn\_global
+=================================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: build_loss_fn_global

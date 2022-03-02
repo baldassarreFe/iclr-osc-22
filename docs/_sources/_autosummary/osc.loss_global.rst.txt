@@ -1,0 +1,31 @@
+osc.loss\_global
+================
+
+.. automodule:: osc.loss_global
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      contrastive_loss_best_worst
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

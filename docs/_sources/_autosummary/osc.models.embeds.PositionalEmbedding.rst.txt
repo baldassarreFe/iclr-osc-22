@@ -1,0 +1,72 @@
+﻿osc.models.embeds.PositionalEmbedding
+=====================================
+
+.. currentmodule:: osc.models.embeds
+
+.. autoclass:: PositionalEmbedding
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~PositionalEmbedding.add_module
+      ~PositionalEmbedding.apply
+      ~PositionalEmbedding.bfloat16
+      ~PositionalEmbedding.buffers
+      ~PositionalEmbedding.children
+      ~PositionalEmbedding.cpu
+      ~PositionalEmbedding.cuda
+      ~PositionalEmbedding.double
+      ~PositionalEmbedding.eval
+      ~PositionalEmbedding.extra_repr
+      ~PositionalEmbedding.float
+      ~PositionalEmbedding.forward
+      ~PositionalEmbedding.get_buffer
+      ~PositionalEmbedding.get_extra_state
+      ~PositionalEmbedding.get_parameter
+      ~PositionalEmbedding.get_submodule
+      ~PositionalEmbedding.half
+      ~PositionalEmbedding.init_weights
+      ~PositionalEmbedding.load_state_dict
+      ~PositionalEmbedding.modules
+      ~PositionalEmbedding.named_buffers
+      ~PositionalEmbedding.named_children
+      ~PositionalEmbedding.named_modules
+      ~PositionalEmbedding.named_parameters
+      ~PositionalEmbedding.parameters
+      ~PositionalEmbedding.register_backward_hook
+      ~PositionalEmbedding.register_buffer
+      ~PositionalEmbedding.register_forward_hook
+      ~PositionalEmbedding.register_forward_pre_hook
+      ~PositionalEmbedding.register_full_backward_hook
+      ~PositionalEmbedding.register_parameter
+      ~PositionalEmbedding.requires_grad_
+      ~PositionalEmbedding.set_extra_state
+      ~PositionalEmbedding.share_memory
+      ~PositionalEmbedding.state_dict
+      ~PositionalEmbedding.to
+      ~PositionalEmbedding.to_empty
+      ~PositionalEmbedding.train
+      ~PositionalEmbedding.type
+      ~PositionalEmbedding.xpu
+      ~PositionalEmbedding.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~PositionalEmbedding.T_destination
+        ~PositionalEmbedding.dump_patches
+   
+   

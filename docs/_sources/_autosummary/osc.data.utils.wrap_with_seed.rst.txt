@@ -1,0 +1,6 @@
+osc.data.utils.wrap\_with\_seed
+===============================
+
+.. currentmodule:: osc.data.utils
+
+.. autofunction:: wrap_with_seed

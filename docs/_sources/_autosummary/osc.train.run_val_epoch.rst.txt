@@ -1,0 +1,6 @@
+osc.train.run\_val\_epoch
+=========================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: run_val_epoch

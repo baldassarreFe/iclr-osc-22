@@ -1,0 +1,6 @@
+osc.viz.utils.fig\_save\_display
+================================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: fig_save_display

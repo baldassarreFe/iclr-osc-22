@@ -1,0 +1,6 @@
+osc.lr\_scheduler.exponential\_lr\_gamma
+========================================
+
+.. currentmodule:: osc.lr_scheduler
+
+.. autofunction:: exponential_lr_gamma

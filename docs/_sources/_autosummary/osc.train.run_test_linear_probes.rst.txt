@@ -1,0 +1,6 @@
+osc.train.run\_test\_linear\_probes
+===================================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: run_test_linear_probes

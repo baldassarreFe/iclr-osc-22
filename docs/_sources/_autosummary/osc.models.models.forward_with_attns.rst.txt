@@ -1,0 +1,6 @@
+osc.models.models.forward\_with\_attns
+======================================
+
+.. currentmodule:: osc.models.models
+
+.. autofunction:: forward_with_attns

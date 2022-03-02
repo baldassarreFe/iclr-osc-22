@@ -1,0 +1,6 @@
+osc.data.utils.augment\_center\_crop
+====================================
+
+.. currentmodule:: osc.data.utils
+
+.. autofunction:: augment_center_crop

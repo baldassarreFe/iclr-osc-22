@@ -1,0 +1,6 @@
+osc.data.objects\_room.get\_iterator
+====================================
+
+.. currentmodule:: osc.data.objects_room
+
+.. autofunction:: get_iterator

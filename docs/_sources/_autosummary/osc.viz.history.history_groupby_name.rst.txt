@@ -1,0 +1,6 @@
+osc.viz.history.history\_groupby\_name
+======================================
+
+.. currentmodule:: osc.viz.history
+
+.. autofunction:: history_groupby_name

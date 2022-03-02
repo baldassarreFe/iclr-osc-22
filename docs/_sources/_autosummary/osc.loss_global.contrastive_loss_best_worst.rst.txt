@@ -1,0 +1,6 @@
+osc.loss\_global.contrastive\_loss\_best\_worst
+===============================================
+
+.. currentmodule:: osc.loss_global
+
+.. autofunction:: contrastive_loss_best_worst

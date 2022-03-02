@@ -1,0 +1,6 @@
+osc.data.objects\_room.show\_sample
+===================================
+
+.. currentmodule:: osc.data.objects_room
+
+.. autofunction:: show_sample

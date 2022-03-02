@@ -1,0 +1,6 @@
+osc.wandb\_utils.filter\_cfg\_for\_wandb
+========================================
+
+.. currentmodule:: osc.wandb_utils
+
+.. autofunction:: filter_cfg_for_wandb

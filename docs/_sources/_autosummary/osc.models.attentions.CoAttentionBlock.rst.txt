@@ -1,0 +1,71 @@
+﻿osc.models.attentions.CoAttentionBlock
+======================================
+
+.. currentmodule:: osc.models.attentions
+
+.. autoclass:: CoAttentionBlock
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~CoAttentionBlock.add_module
+      ~CoAttentionBlock.apply
+      ~CoAttentionBlock.bfloat16
+      ~CoAttentionBlock.buffers
+      ~CoAttentionBlock.children
+      ~CoAttentionBlock.cpu
+      ~CoAttentionBlock.cuda
+      ~CoAttentionBlock.double
+      ~CoAttentionBlock.eval
+      ~CoAttentionBlock.extra_repr
+      ~CoAttentionBlock.float
+      ~CoAttentionBlock.forward
+      ~CoAttentionBlock.get_buffer
+      ~CoAttentionBlock.get_extra_state
+      ~CoAttentionBlock.get_parameter
+      ~CoAttentionBlock.get_submodule
+      ~CoAttentionBlock.half
+      ~CoAttentionBlock.load_state_dict
+      ~CoAttentionBlock.modules
+      ~CoAttentionBlock.named_buffers
+      ~CoAttentionBlock.named_children
+      ~CoAttentionBlock.named_modules
+      ~CoAttentionBlock.named_parameters
+      ~CoAttentionBlock.parameters
+      ~CoAttentionBlock.register_backward_hook
+      ~CoAttentionBlock.register_buffer
+      ~CoAttentionBlock.register_forward_hook
+      ~CoAttentionBlock.register_forward_pre_hook
+      ~CoAttentionBlock.register_full_backward_hook
+      ~CoAttentionBlock.register_parameter
+      ~CoAttentionBlock.requires_grad_
+      ~CoAttentionBlock.set_extra_state
+      ~CoAttentionBlock.share_memory
+      ~CoAttentionBlock.state_dict
+      ~CoAttentionBlock.to
+      ~CoAttentionBlock.to_empty
+      ~CoAttentionBlock.train
+      ~CoAttentionBlock.type
+      ~CoAttentionBlock.xpu
+      ~CoAttentionBlock.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~CoAttentionBlock.T_destination
+        ~CoAttentionBlock.dump_patches
+   
+   

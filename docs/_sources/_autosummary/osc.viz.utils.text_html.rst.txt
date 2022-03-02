@@ -1,0 +1,6 @@
+osc.viz.utils.text\_html
+========================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: text_html

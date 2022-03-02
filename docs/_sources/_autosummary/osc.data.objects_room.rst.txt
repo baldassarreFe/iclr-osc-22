@@ -1,0 +1,33 @@
+osc.data.objects\_room
+======================
+
+.. automodule:: osc.data.objects_room
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      fix_tf_dtypes
+      get_iterator
+      show_sample
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,0 +1,6 @@
+osc.data.tetrominoes.show\_sample
+=================================
+
+.. currentmodule:: osc.data.tetrominoes
+
+.. autofunction:: show_sample

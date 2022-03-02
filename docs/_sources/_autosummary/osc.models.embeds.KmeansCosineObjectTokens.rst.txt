@@ -1,0 +1,71 @@
+﻿osc.models.embeds.KmeansCosineObjectTokens
+==========================================
+
+.. currentmodule:: osc.models.embeds
+
+.. autoclass:: KmeansCosineObjectTokens
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~KmeansCosineObjectTokens.add_module
+      ~KmeansCosineObjectTokens.apply
+      ~KmeansCosineObjectTokens.bfloat16
+      ~KmeansCosineObjectTokens.buffers
+      ~KmeansCosineObjectTokens.children
+      ~KmeansCosineObjectTokens.cpu
+      ~KmeansCosineObjectTokens.cuda
+      ~KmeansCosineObjectTokens.double
+      ~KmeansCosineObjectTokens.eval
+      ~KmeansCosineObjectTokens.extra_repr
+      ~KmeansCosineObjectTokens.float
+      ~KmeansCosineObjectTokens.forward
+      ~KmeansCosineObjectTokens.get_buffer
+      ~KmeansCosineObjectTokens.get_extra_state
+      ~KmeansCosineObjectTokens.get_parameter
+      ~KmeansCosineObjectTokens.get_submodule
+      ~KmeansCosineObjectTokens.half
+      ~KmeansCosineObjectTokens.load_state_dict
+      ~KmeansCosineObjectTokens.modules
+      ~KmeansCosineObjectTokens.named_buffers
+      ~KmeansCosineObjectTokens.named_children
+      ~KmeansCosineObjectTokens.named_modules
+      ~KmeansCosineObjectTokens.named_parameters
+      ~KmeansCosineObjectTokens.parameters
+      ~KmeansCosineObjectTokens.register_backward_hook
+      ~KmeansCosineObjectTokens.register_buffer
+      ~KmeansCosineObjectTokens.register_forward_hook
+      ~KmeansCosineObjectTokens.register_forward_pre_hook
+      ~KmeansCosineObjectTokens.register_full_backward_hook
+      ~KmeansCosineObjectTokens.register_parameter
+      ~KmeansCosineObjectTokens.requires_grad_
+      ~KmeansCosineObjectTokens.set_extra_state
+      ~KmeansCosineObjectTokens.share_memory
+      ~KmeansCosineObjectTokens.state_dict
+      ~KmeansCosineObjectTokens.to
+      ~KmeansCosineObjectTokens.to_empty
+      ~KmeansCosineObjectTokens.train
+      ~KmeansCosineObjectTokens.type
+      ~KmeansCosineObjectTokens.xpu
+      ~KmeansCosineObjectTokens.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~KmeansCosineObjectTokens.T_destination
+        ~KmeansCosineObjectTokens.dump_patches
+   
+   

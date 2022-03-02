@@ -1,0 +1,6 @@
+osc.data.clevr\_with\_masks.get\_iterator
+=========================================
+
+.. currentmodule:: osc.data.clevr_with_masks
+
+.. autofunction:: get_iterator

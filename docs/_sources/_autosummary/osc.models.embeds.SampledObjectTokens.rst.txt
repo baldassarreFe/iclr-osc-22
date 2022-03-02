@@ -1,0 +1,72 @@
+﻿osc.models.embeds.SampledObjectTokens
+=====================================
+
+.. currentmodule:: osc.models.embeds
+
+.. autoclass:: SampledObjectTokens
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~SampledObjectTokens.add_module
+      ~SampledObjectTokens.apply
+      ~SampledObjectTokens.bfloat16
+      ~SampledObjectTokens.buffers
+      ~SampledObjectTokens.children
+      ~SampledObjectTokens.cpu
+      ~SampledObjectTokens.cuda
+      ~SampledObjectTokens.double
+      ~SampledObjectTokens.eval
+      ~SampledObjectTokens.extra_repr
+      ~SampledObjectTokens.float
+      ~SampledObjectTokens.forward
+      ~SampledObjectTokens.get_buffer
+      ~SampledObjectTokens.get_extra_state
+      ~SampledObjectTokens.get_parameter
+      ~SampledObjectTokens.get_submodule
+      ~SampledObjectTokens.half
+      ~SampledObjectTokens.init_weights
+      ~SampledObjectTokens.load_state_dict
+      ~SampledObjectTokens.modules
+      ~SampledObjectTokens.named_buffers
+      ~SampledObjectTokens.named_children
+      ~SampledObjectTokens.named_modules
+      ~SampledObjectTokens.named_parameters
+      ~SampledObjectTokens.parameters
+      ~SampledObjectTokens.register_backward_hook
+      ~SampledObjectTokens.register_buffer
+      ~SampledObjectTokens.register_forward_hook
+      ~SampledObjectTokens.register_forward_pre_hook
+      ~SampledObjectTokens.register_full_backward_hook
+      ~SampledObjectTokens.register_parameter
+      ~SampledObjectTokens.requires_grad_
+      ~SampledObjectTokens.set_extra_state
+      ~SampledObjectTokens.share_memory
+      ~SampledObjectTokens.state_dict
+      ~SampledObjectTokens.to
+      ~SampledObjectTokens.to_empty
+      ~SampledObjectTokens.train
+      ~SampledObjectTokens.type
+      ~SampledObjectTokens.xpu
+      ~SampledObjectTokens.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~SampledObjectTokens.T_destination
+        ~SampledObjectTokens.dump_patches
+   
+   

@@ -1,0 +1,6 @@
+osc.data.tfrecords.serialize\_image
+===================================
+
+.. currentmodule:: osc.data.tfrecords
+
+.. autofunction:: serialize_image

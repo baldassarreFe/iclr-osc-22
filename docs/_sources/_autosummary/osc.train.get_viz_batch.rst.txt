@@ -1,0 +1,6 @@
+osc.train.get\_viz\_batch
+=========================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: get_viz_batch

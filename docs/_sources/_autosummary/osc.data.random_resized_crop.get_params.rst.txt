@@ -1,0 +1,6 @@
+osc.data.random\_resized\_crop.get\_params
+==========================================
+
+.. currentmodule:: osc.data.random_resized_crop
+
+.. autofunction:: get_params

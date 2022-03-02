@@ -1,0 +1,71 @@
+﻿osc.models.attentions.SelfAttentionBlock
+========================================
+
+.. currentmodule:: osc.models.attentions
+
+.. autoclass:: SelfAttentionBlock
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~SelfAttentionBlock.add_module
+      ~SelfAttentionBlock.apply
+      ~SelfAttentionBlock.bfloat16
+      ~SelfAttentionBlock.buffers
+      ~SelfAttentionBlock.children
+      ~SelfAttentionBlock.cpu
+      ~SelfAttentionBlock.cuda
+      ~SelfAttentionBlock.double
+      ~SelfAttentionBlock.eval
+      ~SelfAttentionBlock.extra_repr
+      ~SelfAttentionBlock.float
+      ~SelfAttentionBlock.forward
+      ~SelfAttentionBlock.get_buffer
+      ~SelfAttentionBlock.get_extra_state
+      ~SelfAttentionBlock.get_parameter
+      ~SelfAttentionBlock.get_submodule
+      ~SelfAttentionBlock.half
+      ~SelfAttentionBlock.load_state_dict
+      ~SelfAttentionBlock.modules
+      ~SelfAttentionBlock.named_buffers
+      ~SelfAttentionBlock.named_children
+      ~SelfAttentionBlock.named_modules
+      ~SelfAttentionBlock.named_parameters
+      ~SelfAttentionBlock.parameters
+      ~SelfAttentionBlock.register_backward_hook
+      ~SelfAttentionBlock.register_buffer
+      ~SelfAttentionBlock.register_forward_hook
+      ~SelfAttentionBlock.register_forward_pre_hook
+      ~SelfAttentionBlock.register_full_backward_hook
+      ~SelfAttentionBlock.register_parameter
+      ~SelfAttentionBlock.requires_grad_
+      ~SelfAttentionBlock.set_extra_state
+      ~SelfAttentionBlock.share_memory
+      ~SelfAttentionBlock.state_dict
+      ~SelfAttentionBlock.to
+      ~SelfAttentionBlock.to_empty
+      ~SelfAttentionBlock.train
+      ~SelfAttentionBlock.type
+      ~SelfAttentionBlock.xpu
+      ~SelfAttentionBlock.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~SelfAttentionBlock.T_destination
+        ~SelfAttentionBlock.dump_patches
+   
+   

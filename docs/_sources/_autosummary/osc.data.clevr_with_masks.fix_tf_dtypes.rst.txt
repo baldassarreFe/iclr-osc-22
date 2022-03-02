@@ -1,0 +1,6 @@
+osc.data.clevr\_with\_masks.fix\_tf\_dtypes
+===========================================
+
+.. currentmodule:: osc.data.clevr_with_masks
+
+.. autofunction:: fix_tf_dtypes

@@ -1,0 +1,46 @@
+osc.data.utils
+==============
+
+.. automodule:: osc.data.utils
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      augment_center_crop
+      augment_train
+      augment_twice
+      img_hwc_to_chw
+      normalize_tf
+      unnormalize_pt
+      wrap_with_seed
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      AugmentFnStateless
+   
+   
+
+   
+   
+   
+
+
+

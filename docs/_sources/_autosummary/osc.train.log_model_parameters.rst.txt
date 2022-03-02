@@ -1,0 +1,6 @@
+osc.train.log\_model\_parameters
+================================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: log_model_parameters

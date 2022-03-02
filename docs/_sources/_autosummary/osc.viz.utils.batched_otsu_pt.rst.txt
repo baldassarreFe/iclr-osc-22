@@ -1,0 +1,6 @@
+osc.viz.utils.batched\_otsu\_pt
+===============================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: batched_otsu_pt

@@ -1,0 +1,6 @@
+osc.data.clevr\_with\_masks.prepare\_test\_segmentation
+=======================================================
+
+.. currentmodule:: osc.data.clevr_with_masks
+
+.. autofunction:: prepare_test_segmentation

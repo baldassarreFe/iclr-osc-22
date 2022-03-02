@@ -1,0 +1,6 @@
+osc.loss\_objects.matching\_contrastive\_loss
+=============================================
+
+.. currentmodule:: osc.loss_objects
+
+.. autofunction:: matching_contrastive_loss

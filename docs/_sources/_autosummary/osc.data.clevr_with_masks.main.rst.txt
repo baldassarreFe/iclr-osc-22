@@ -1,0 +1,6 @@
+osc.data.clevr\_with\_masks.main
+================================
+
+.. currentmodule:: osc.data.clevr_with_masks
+
+.. autofunction:: main

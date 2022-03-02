@@ -1,0 +1,6 @@
+osc.viz.rollout.slot\_attn\_rollout
+===================================
+
+.. currentmodule:: osc.viz.rollout
+
+.. autofunction:: slot_attn_rollout

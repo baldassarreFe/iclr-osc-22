@@ -1,0 +1,6 @@
+osc.train.log\_env\_info
+========================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: log_env_info

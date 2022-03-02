@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>osc.train.main &mdash; ICLR OSC 2022 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="osc.train.run_test_linear_probes" href="osc.train.run_test_linear_probes.html" />
+    <link rel="prev" title="osc.train.log_model_parameters" href="osc.train.log_model_parameters.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> ICLR OSC 2022
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="osc.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="osc.data.html">osc.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_global.html">osc.loss_global</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_objects.html">osc.loss_objects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.lr_scheduler.html">osc.lr_scheduler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.models.html">osc.models</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="osc.train.html">osc.train</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="osc.train.batches_per_epoch_test.html">osc.train.batches_per_epoch_test</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.batches_per_epoch_train.html">osc.train.batches_per_epoch_train</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.batches_per_epoch_val.html">osc.train.batches_per_epoch_val</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_dataset_test.html">osc.train.build_dataset_test</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_dataset_train.html">osc.train.build_dataset_train</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_dataset_val.html">osc.train.build_dataset_val</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_dataset_vqa.html">osc.train.build_dataset_vqa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_linear_probe.html">osc.train.build_linear_probe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_loss_fn_global.html">osc.train.build_loss_fn_global</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_loss_fn_objects.html">osc.train.build_loss_fn_objects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_model.html">osc.train.build_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_optimizer.html">osc.train.build_optimizer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.build_scheduler.html">osc.train.build_scheduler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.extract_vqa_features.html">osc.train.extract_vqa_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.get_viz_batch.html">osc.train.get_viz_batch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.log_env_info.html">osc.train.log_env_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.log_model_parameters.html">osc.train.log_model_parameters</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">osc.train.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.run_test_linear_probes.html">osc.train.run_test_linear_probes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.run_test_segmentation.html">osc.train.run_test_segmentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.run_train_epoch.html">osc.train.run_train_epoch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.run_train_val_viz_epochs.html">osc.train.run_train_val_viz_epochs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.run_val_epoch.html">osc.train.run_val_epoch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.run_viz.html">osc.train.run_viz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.update_cfg.html">osc.train.update_cfg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.train.ModelLoss.html">osc.train.ModelLoss</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="osc.utils.html">osc.utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.viz.html">osc.viz</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.wandb_utils.html">osc.wandb_utils</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ICLR OSC 2022</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="osc.html">osc</a> &raquo;</li>
+          <li><a href="osc.train.html">osc.train</a> &raquo;</li>
+      <li>osc.train.main</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/osc.train.main.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="osc-train-main">
+<h1>osc.train.main<a class="headerlink" href="#osc-train-main" title="Permalink to this headline"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="osc.train.main">
+<span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cfg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/osc/train.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#osc.train.main" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.10)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="osc.train.log_model_parameters.html" class="btn btn-neutral float-left" title="osc.train.log_model_parameters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="osc.train.run_test_linear_probes.html" class="btn btn-neutral float-right" title="osc.train.run_test_linear_probes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Federico Baldassarre.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

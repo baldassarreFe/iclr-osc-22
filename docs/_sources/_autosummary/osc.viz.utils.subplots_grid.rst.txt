@@ -1,0 +1,6 @@
+osc.viz.utils.subplots\_grid
+============================
+
+.. currentmodule:: osc.viz.utils
+
+.. autofunction:: subplots_grid

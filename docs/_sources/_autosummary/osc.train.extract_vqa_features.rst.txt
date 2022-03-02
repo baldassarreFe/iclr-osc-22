@@ -1,0 +1,6 @@
+osc.train.extract\_vqa\_features
+================================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: extract_vqa_features

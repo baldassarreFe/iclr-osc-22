@@ -1,0 +1,40 @@
+osc.lr\_scheduler
+=================
+
+.. automodule:: osc.lr_scheduler
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      exponential_lr_gamma
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      LinearWarmupCosineAnneal
+   
+   
+
+   
+   
+   
+
+
+

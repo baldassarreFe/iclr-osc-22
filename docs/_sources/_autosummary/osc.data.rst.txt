@@ -1,0 +1,37 @@
+osc.data
+========
+
+.. automodule:: osc.data
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. autosummary::
+   :toctree:
+   :template: custom-module-template.rst
+   :recursive:
+
+   osc.data.clevr_with_masks
+   osc.data.iterable_dataloader
+   osc.data.multi_dsprites
+   osc.data.objects_room
+   osc.data.random_resized_crop
+   osc.data.tetrominoes
+   osc.data.tfrecords
+   osc.data.utils
+

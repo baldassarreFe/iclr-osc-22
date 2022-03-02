@@ -1,0 +1,71 @@
+﻿osc.models.attentions.CrossAttentionBlock
+=========================================
+
+.. currentmodule:: osc.models.attentions
+
+.. autoclass:: CrossAttentionBlock
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~CrossAttentionBlock.add_module
+      ~CrossAttentionBlock.apply
+      ~CrossAttentionBlock.bfloat16
+      ~CrossAttentionBlock.buffers
+      ~CrossAttentionBlock.children
+      ~CrossAttentionBlock.cpu
+      ~CrossAttentionBlock.cuda
+      ~CrossAttentionBlock.double
+      ~CrossAttentionBlock.eval
+      ~CrossAttentionBlock.extra_repr
+      ~CrossAttentionBlock.float
+      ~CrossAttentionBlock.forward
+      ~CrossAttentionBlock.get_buffer
+      ~CrossAttentionBlock.get_extra_state
+      ~CrossAttentionBlock.get_parameter
+      ~CrossAttentionBlock.get_submodule
+      ~CrossAttentionBlock.half
+      ~CrossAttentionBlock.load_state_dict
+      ~CrossAttentionBlock.modules
+      ~CrossAttentionBlock.named_buffers
+      ~CrossAttentionBlock.named_children
+      ~CrossAttentionBlock.named_modules
+      ~CrossAttentionBlock.named_parameters
+      ~CrossAttentionBlock.parameters
+      ~CrossAttentionBlock.register_backward_hook
+      ~CrossAttentionBlock.register_buffer
+      ~CrossAttentionBlock.register_forward_hook
+      ~CrossAttentionBlock.register_forward_pre_hook
+      ~CrossAttentionBlock.register_full_backward_hook
+      ~CrossAttentionBlock.register_parameter
+      ~CrossAttentionBlock.requires_grad_
+      ~CrossAttentionBlock.set_extra_state
+      ~CrossAttentionBlock.share_memory
+      ~CrossAttentionBlock.state_dict
+      ~CrossAttentionBlock.to
+      ~CrossAttentionBlock.to_empty
+      ~CrossAttentionBlock.train
+      ~CrossAttentionBlock.type
+      ~CrossAttentionBlock.xpu
+      ~CrossAttentionBlock.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~CrossAttentionBlock.T_destination
+        ~CrossAttentionBlock.dump_patches
+   
+   

@@ -1,0 +1,48 @@
+osc.utils
+=========
+
+.. automodule:: osc.utils
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      batches_per_epoch
+      fill_diagonal_
+      latest_checkpoint
+      print_arrays
+      ravel_multi_index_tf
+      seed_everything
+      to_dotlist
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      AverageMetric
+      SigIntCatcher
+      StepCounter
+   
+   
+
+   
+   
+   
+
+
+

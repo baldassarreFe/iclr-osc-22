@@ -1,0 +1,33 @@
+osc.data.multi\_dsprites
+========================
+
+.. automodule:: osc.data.multi_dsprites
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      fix_tf_dtypes
+      get_iterator
+      show_sample
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

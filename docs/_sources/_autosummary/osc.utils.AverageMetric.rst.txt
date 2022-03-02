@@ -1,0 +1,26 @@
+osc.utils.AverageMetric
+=======================
+
+.. currentmodule:: osc.utils
+
+.. autoclass:: AverageMetric
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~AverageMetric.compute
+      ~AverageMetric.update
+   
+   
+
+   
+   
+   

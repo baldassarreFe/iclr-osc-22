@@ -1,0 +1,64 @@
+osc.train
+=========
+
+.. automodule:: osc.train
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      batches_per_epoch_test
+      batches_per_epoch_train
+      batches_per_epoch_val
+      build_dataset_test
+      build_dataset_train
+      build_dataset_val
+      build_dataset_vqa
+      build_linear_probe
+      build_loss_fn_global
+      build_loss_fn_objects
+      build_model
+      build_optimizer
+      build_scheduler
+      extract_vqa_features
+      get_viz_batch
+      log_env_info
+      log_model_parameters
+      main
+      run_test_linear_probes
+      run_test_segmentation
+      run_train_epoch
+      run_train_val_viz_epochs
+      run_val_epoch
+      run_viz
+      update_cfg
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      ModelLoss
+   
+   
+
+   
+   
+   
+
+
+

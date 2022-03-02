@@ -1,0 +1,6 @@
+osc.train.build\_scheduler
+==========================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: build_scheduler

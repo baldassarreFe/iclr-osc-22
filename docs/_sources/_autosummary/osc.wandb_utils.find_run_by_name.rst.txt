@@ -1,0 +1,6 @@
+osc.wandb\_utils.find\_run\_by\_name
+====================================
+
+.. currentmodule:: osc.wandb_utils
+
+.. autofunction:: find_run_by_name

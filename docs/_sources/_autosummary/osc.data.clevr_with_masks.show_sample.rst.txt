@@ -1,0 +1,6 @@
+osc.data.clevr\_with\_masks.show\_sample
+========================================
+
+.. currentmodule:: osc.data.clevr_with_masks
+
+.. autofunction:: show_sample

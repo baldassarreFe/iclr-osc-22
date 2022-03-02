@@ -1,0 +1,6 @@
+osc.utils.batches\_per\_epoch
+=============================
+
+.. currentmodule:: osc.utils
+
+.. autofunction:: batches_per_epoch

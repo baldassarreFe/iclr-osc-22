@@ -1,0 +1,6 @@
+osc.train.build\_optimizer
+==========================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: build_optimizer

@@ -1,0 +1,32 @@
+osc.models.vit
+==============
+
+.. automodule:: osc.models.vit
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class-template.rst
+      :nosignatures:
+   
+      ViTBackbone
+   
+   
+
+   
+   
+   
+
+
+

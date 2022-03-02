@@ -1,0 +1,6 @@
+osc.data.utils.augment\_train
+=============================
+
+.. currentmodule:: osc.data.utils
+
+.. autofunction:: augment_train

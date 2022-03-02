@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>osc.data.utils &mdash; ICLR OSC 2022 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="osc.data.utils.augment_center_crop" href="osc.data.utils.augment_center_crop.html" />
+    <link rel="prev" title="osc.data.tfrecords.serialize_image_and_mask" href="osc.data.tfrecords.serialize_image_and_mask.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> ICLR OSC 2022
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="osc.html">API Reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="osc.data.html">osc.data</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="osc.data.clevr_with_masks.html">osc.data.clevr_with_masks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.data.iterable_dataloader.html">osc.data.iterable_dataloader</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.data.multi_dsprites.html">osc.data.multi_dsprites</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.data.objects_room.html">osc.data.objects_room</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.data.random_resized_crop.html">osc.data.random_resized_crop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.data.tetrominoes.html">osc.data.tetrominoes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="osc.data.tfrecords.html">osc.data.tfrecords</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">osc.data.utils</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.augment_center_crop.html">osc.data.utils.augment_center_crop</a></li>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.augment_train.html">osc.data.utils.augment_train</a></li>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.augment_twice.html">osc.data.utils.augment_twice</a></li>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.img_hwc_to_chw.html">osc.data.utils.img_hwc_to_chw</a></li>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.normalize_tf.html">osc.data.utils.normalize_tf</a></li>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.unnormalize_pt.html">osc.data.utils.unnormalize_pt</a></li>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.wrap_with_seed.html">osc.data.utils.wrap_with_seed</a></li>
+<li class="toctree-l4"><a class="reference internal" href="osc.data.utils.AugmentFnStateless.html">osc.data.utils.AugmentFnStateless</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_global.html">osc.loss_global</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.loss_objects.html">osc.loss_objects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.lr_scheduler.html">osc.lr_scheduler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.models.html">osc.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.train.html">osc.train</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.utils.html">osc.utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.viz.html">osc.viz</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osc.wandb_utils.html">osc.wandb_utils</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ICLR OSC 2022</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="osc.html">osc</a> &raquo;</li>
+          <li><a href="osc.data.html">osc.data</a> &raquo;</li>
+      <li>osc.data.utils</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/osc.data.utils.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-osc.data.utils">
+<span id="osc-data-utils"></span><h1>osc.data.utils<a class="headerlink" href="#module-osc.data.utils" title="Permalink to this headline"></a></h1>
+<p>Helper functions to bridge tensorflow image data to pytorch.</p>
+<p>Functions:</p>
+<ul>
+<li><p>Image normalization back and forth</p></li>
+<li><p>Augmentation</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Augmentations with ‘’stateless’’ random seeds</p></li>
+<li><p>Fixed augmentations</p></li>
+<li><p>Double augmentation for contrastive training</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.data.utils.augment_center_crop.html#osc.data.utils.augment_center_crop" title="osc.data.utils.augment_center_crop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">augment_center_crop</span></code></a></p></td>
+<td><p>Deterministic center crop and processing as in <a class="reference internal" href="osc.data.utils.augment_train.html#osc.data.utils.augment_train" title="osc.data.utils.augment_train"><code class="xref py py-func docutils literal notranslate"><span class="pre">augment_train()</span></code></a></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="osc.data.utils.augment_train.html#osc.data.utils.augment_train" title="osc.data.utils.augment_train"><code class="xref py py-obj docutils literal notranslate"><span class="pre">augment_train</span></code></a></p></td>
+<td><p>Augment image for train/val.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.data.utils.augment_twice.html#osc.data.utils.augment_twice" title="osc.data.utils.augment_twice"><code class="xref py py-obj docutils literal notranslate"><span class="pre">augment_twice</span></code></a></p></td>
+<td><p>Augment image twice with two different functions.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="osc.data.utils.img_hwc_to_chw.html#osc.data.utils.img_hwc_to_chw" title="osc.data.utils.img_hwc_to_chw"><code class="xref py py-obj docutils literal notranslate"><span class="pre">img_hwc_to_chw</span></code></a></p></td>
+<td><p>Image channels [..., H, W, C] -&gt; [..., C, H, W]</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.data.utils.normalize_tf.html#osc.data.utils.normalize_tf" title="osc.data.utils.normalize_tf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">normalize_tf</span></code></a></p></td>
+<td><p>Normalize tf.float32 image with [..., H, W, C] channel order.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="osc.data.utils.unnormalize_pt.html#osc.data.utils.unnormalize_pt" title="osc.data.utils.unnormalize_pt"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unnormalize_pt</span></code></a></p></td>
+<td><p>Un-normalize torch.float32 image with [..., C, H, W] channel order.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.data.utils.wrap_with_seed.html#osc.data.utils.wrap_with_seed" title="osc.data.utils.wrap_with_seed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">wrap_with_seed</span></code></a></p></td>
+<td><p>Wrap stateless random functions by providing a new seed to each invocation.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="osc.data.utils.AugmentFnStateless.html#osc.data.utils.AugmentFnStateless" title="osc.data.utils.AugmentFnStateless"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AugmentFnStateless</span></code></a></p></td>
+<td><p>Function type signature for TF stateless random.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="osc.data.tfrecords.serialize_image_and_mask.html" class="btn btn-neutral float-left" title="osc.data.tfrecords.serialize_image_and_mask" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="osc.data.utils.augment_center_crop.html" class="btn btn-neutral float-right" title="osc.data.utils.augment_center_crop" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Federico Baldassarre.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

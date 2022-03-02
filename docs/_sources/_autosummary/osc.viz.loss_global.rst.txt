@@ -1,0 +1,32 @@
+osc.viz.loss\_global
+====================
+
+.. automodule:: osc.viz.loss_global
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      viz_contrastive_loss_global
+      viz_contrastive_loss_global_probs
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

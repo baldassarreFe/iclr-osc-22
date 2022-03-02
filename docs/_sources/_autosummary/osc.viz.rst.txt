@@ -1,0 +1,38 @@
+osc.viz
+=======
+
+.. automodule:: osc.viz
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. autosummary::
+   :toctree:
+   :template: custom-module-template.rst
+   :recursive:
+
+   osc.viz.attentions
+   osc.viz.backbone
+   osc.viz.embeds
+   osc.viz.history
+   osc.viz.loss_global
+   osc.viz.loss_objects
+   osc.viz.rollout
+   osc.viz.segmentation
+   osc.viz.utils
+

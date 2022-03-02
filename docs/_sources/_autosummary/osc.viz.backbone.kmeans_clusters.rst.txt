@@ -1,0 +1,6 @@
+osc.viz.backbone.kmeans\_clusters
+=================================
+
+.. currentmodule:: osc.viz.backbone
+
+.. autofunction:: kmeans_clusters

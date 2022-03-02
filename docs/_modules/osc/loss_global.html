@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>osc.loss_global &mdash; ICLR OSC 2022 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> ICLR OSC 2022
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../setup.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_autosummary/osc.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">ICLR OSC 2022</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>osc.loss_global</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for osc.loss_global</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
+
+<span class="kn">from</span> <span class="nn">osc.utils</span> <span class="kn">import</span> <span class="n">cos_pairwise</span><span class="p">,</span> <span class="n">l2_normalize</span>
+
+
+<span class="nd">@torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span>
+<span class="k">def</span> <span class="nf">cosine_sim_loss</span><span class="p">(</span><span class="n">feats</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">projs</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">reduction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mean&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Cosine similarity loss for BYOL and SimSiam.</span>
+
+<span class="sd">    For both `feats` and `projs`, the vectors in position ``i`` and ``i + B``</span>
+<span class="sd">    must represent the embeddings of different augmentations of the same image.</span>
+
+<span class="sd">    In BYOL, `feats` should come from an offline network updated with momentum.</span>
+<span class="sd">    In SimSiam, `feats` comes from the same online network that computes `proj`.</span>
+<span class="sd">    Detach (stop gradient) is always called on the `feats` embeddings.</span>
+
+<span class="sd">    The loss is made symmetric w.r.t. the image augmentations.</span>
+
+<span class="sd">    Examples:</span>
+
+<span class="sd">        BYOL:</span>
+
+<span class="sd">        &gt;&gt;&gt; imgs = torch.rand(4, 3, 256, 256)</span>
+<span class="sd">        &gt;&gt;&gt; inputs = torch.cat([aug0(imgs), aug1(imgs)], dim=0)</span>
+<span class="sd">        &gt;&gt;&gt; feats_offline = backbone_offline(inputs)</span>
+<span class="sd">        &gt;&gt;&gt; feats = backbone(inputs)</span>
+<span class="sd">        &gt;&gt;&gt; projs = projection(feats)</span>
+<span class="sd">        &gt;&gt;&gt; cosine_sim_loss(feats_offline, projs)</span>
+
+<span class="sd">        SimSiam:</span>
+
+<span class="sd">        &gt;&gt;&gt; imgs = torch.rand(4, 3, 256, 256)</span>
+<span class="sd">        &gt;&gt;&gt; inputs = torch.cat([aug0(imgs), aug1(imgs)], dim=0)</span>
+<span class="sd">        &gt;&gt;&gt; feats = backbone(inputs)</span>
+<span class="sd">        &gt;&gt;&gt; projs = projection(feats)</span>
+<span class="sd">        &gt;&gt;&gt; cosine_sim_loss(feats, projs)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        feats: [2B, C] tensor of image features</span>
+<span class="sd">        projs: [2B, C] tensor of projected image features</span>
+<span class="sd">        reduction: &#39;mean&#39;, &#39;sum&#39;, or &#39;none&#39;</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Scalar loss if reduction is &#39;mean&#39; or &#39;sum&#39;.</span>
+<span class="sd">        A vector of ``2B`` losses if reduction is &#39;none&#39;</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">B</span> <span class="o">=</span> <span class="n">feats</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">//</span> <span class="mi">2</span>
+    <span class="n">feats</span> <span class="o">=</span> <span class="n">l2_normalize</span><span class="p">(</span><span class="n">feats</span><span class="o">.</span><span class="n">detach</span><span class="p">())</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">projs</span> <span class="o">=</span> <span class="n">l2_normalize</span><span class="p">(</span><span class="n">projs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">reduction</span> <span class="o">==</span> <span class="s2">&quot;mean&quot;</span><span class="p">:</span>
+        <span class="c1"># Same as: - (feats * projs).sum(dim=1).mean(dim=0)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;bc,bc-&gt;&quot;</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">projs</span><span class="p">)</span><span class="o">.</span><span class="n">div_</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">B</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">reduction</span> <span class="o">==</span> <span class="s2">&quot;sum&quot;</span><span class="p">:</span>
+        <span class="c1"># Same as: - (feats * projs).sum(dim=1).sum(dim=0)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;bc,bc-&gt;&quot;</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">projs</span><span class="p">)</span><span class="o">.</span><span class="n">neg_</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">reduction</span> <span class="o">==</span> <span class="s2">&quot;none&quot;</span><span class="p">:</span>
+        <span class="c1"># Same as: - (feats * projs).sum(dim=1)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;bc,bc-&gt;b&quot;</span><span class="p">,</span> <span class="n">feats</span><span class="p">,</span> <span class="n">projs</span><span class="p">)</span><span class="o">.</span><span class="n">neg_</span><span class="p">()</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">reduction</span><span class="p">)</span>
+
+
+<span class="nd">@torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span>
+<span class="k">def</span> <span class="nf">contrastive_loss</span><span class="p">(</span>
+    <span class="n">projs</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">reduction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mean&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Contrastive loss for SimCLR.</span>
+
+<span class="sd">    The vectors in position ``i`` and ``i + B`` of `projs` must</span>
+<span class="sd">    represent the embeddings of different augmentations of the same image.</span>
+<span class="sd">    The loss can be thought as a classification problem with ``2B-1`` classes where</span>
+<span class="sd">    the ``i``-th sample should be classified as the ``i+B``-th sample and viceversa.</span>
+<span class="sd">    The loss is made symmetric w.r.t. the image augmentations.</span>
+
+<span class="sd">    Worst case:</span>
+<span class="sd">    if all embeddings collapse to the same value, the loss will be ``log(2B-1)``.</span>
+
+<span class="sd">    Best case:</span>
+<span class="sd">    if each image gets an embedding that is orthogonal to all others,</span>
+<span class="sd">    the loss will be ``log(exp(1/t) + 2B - 2) - 1/t``.</span>
+
+<span class="sd">    Examples:</span>
+
+<span class="sd">        SimSiam:</span>
+
+<span class="sd">        &gt;&gt;&gt; imgs = torch.rand(4, 3, 256, 256)</span>
+<span class="sd">        &gt;&gt;&gt; inputs = torch.cat([aug0(imgs), aug1(imgs)], dim=0)</span>
+<span class="sd">        &gt;&gt;&gt; feats = backbone(inputs)</span>
+<span class="sd">        &gt;&gt;&gt; projs = projection(feats)</span>
+<span class="sd">        &gt;&gt;&gt; contrastive_loss(projs)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        projs: [2B, C] tensor of projected image features</span>
+<span class="sd">        temperature: temperature scaling</span>
+<span class="sd">        reduction: &#39;mean&#39;, &#39;sum&#39;, or &#39;none&#39;</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Scalar loss if reduction is &#39;mean&#39; or &#39;sum&#39;.</span>
+<span class="sd">        A vector of ``2B`` losses if reduction is &#39;none&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">B</span> <span class="o">=</span> <span class="n">projs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">//</span> <span class="mi">2</span>
+    <span class="n">cos</span> <span class="o">=</span> <span class="n">cos_pairwise</span><span class="p">(</span><span class="n">projs</span><span class="p">)</span><span class="o">.</span><span class="n">div_</span><span class="p">(</span><span class="n">temperature</span><span class="p">)</span><span class="o">.</span><span class="n">fill_diagonal_</span><span class="p">(</span><span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>  <span class="c1"># [2B, 2B]</span>
+    <span class="n">target</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">B</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">cos</span><span class="o">.</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">B</span><span class="p">)</span>  <span class="c1"># [2B]</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">cross_entropy</span><span class="p">(</span><span class="n">cos</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="n">reduction</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">loss</span>
+
+
+<div class="viewcode-block" id="contrastive_loss_best_worst"><a class="viewcode-back" href="../../_autosummary/osc.loss_global.contrastive_loss_best_worst.html#osc.loss_global.contrastive_loss_best_worst">[docs]</a><span class="k">def</span> <span class="nf">contrastive_loss_best_worst</span><span class="p">(</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Best and worst case for ``contrastive_loss()``.&quot;&quot;&quot;</span>
+    <span class="n">best</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">temperature</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">batch_size</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">temperature</span>
+    <span class="n">worst</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">batch_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">best</span><span class="p">,</span> <span class="n">worst</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Federico Baldassarre.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

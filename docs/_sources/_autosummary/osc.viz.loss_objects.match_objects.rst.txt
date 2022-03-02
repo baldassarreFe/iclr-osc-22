@@ -1,0 +1,6 @@
+osc.viz.loss\_objects.match\_objects
+====================================
+
+.. currentmodule:: osc.viz.loss_objects
+
+.. autofunction:: match_objects

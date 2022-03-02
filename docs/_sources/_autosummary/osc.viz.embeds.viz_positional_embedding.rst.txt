@@ -1,0 +1,6 @@
+osc.viz.embeds.viz\_positional\_embedding
+=========================================
+
+.. currentmodule:: osc.viz.embeds
+
+.. autofunction:: viz_positional_embedding

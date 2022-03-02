@@ -1,0 +1,34 @@
+osc.viz.attentions
+==================
+
+.. automodule:: osc.viz.attentions
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      viz_slot_attns
+      viz_slot_rollout_all_options
+      viz_vit_attns
+      viz_vit_rollout_all_options
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

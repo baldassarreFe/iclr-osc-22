@@ -1,0 +1,6 @@
+osc.data.tetrominoes.fix\_tf\_dtypes
+====================================
+
+.. currentmodule:: osc.data.tetrominoes
+
+.. autofunction:: fix_tf_dtypes

@@ -1,0 +1,36 @@
+﻿osc.models.models.ModelOutput
+=============================
+
+.. currentmodule:: osc.models.models
+
+.. autoclass:: ModelOutput
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~ModelOutput.count
+      ~ModelOutput.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~ModelOutput.f_backbone
+        ~ModelOutput.f_global
+        ~ModelOutput.f_slots
+        ~ModelOutput.p_global
+        ~ModelOutput.p_slots
+   
+   

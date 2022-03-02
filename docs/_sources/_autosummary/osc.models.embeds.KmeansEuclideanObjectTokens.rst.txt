@@ -1,0 +1,71 @@
+﻿osc.models.embeds.KmeansEuclideanObjectTokens
+=============================================
+
+.. currentmodule:: osc.models.embeds
+
+.. autoclass:: KmeansEuclideanObjectTokens
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~KmeansEuclideanObjectTokens.add_module
+      ~KmeansEuclideanObjectTokens.apply
+      ~KmeansEuclideanObjectTokens.bfloat16
+      ~KmeansEuclideanObjectTokens.buffers
+      ~KmeansEuclideanObjectTokens.children
+      ~KmeansEuclideanObjectTokens.cpu
+      ~KmeansEuclideanObjectTokens.cuda
+      ~KmeansEuclideanObjectTokens.double
+      ~KmeansEuclideanObjectTokens.eval
+      ~KmeansEuclideanObjectTokens.extra_repr
+      ~KmeansEuclideanObjectTokens.float
+      ~KmeansEuclideanObjectTokens.forward
+      ~KmeansEuclideanObjectTokens.get_buffer
+      ~KmeansEuclideanObjectTokens.get_extra_state
+      ~KmeansEuclideanObjectTokens.get_parameter
+      ~KmeansEuclideanObjectTokens.get_submodule
+      ~KmeansEuclideanObjectTokens.half
+      ~KmeansEuclideanObjectTokens.load_state_dict
+      ~KmeansEuclideanObjectTokens.modules
+      ~KmeansEuclideanObjectTokens.named_buffers
+      ~KmeansEuclideanObjectTokens.named_children
+      ~KmeansEuclideanObjectTokens.named_modules
+      ~KmeansEuclideanObjectTokens.named_parameters
+      ~KmeansEuclideanObjectTokens.parameters
+      ~KmeansEuclideanObjectTokens.register_backward_hook
+      ~KmeansEuclideanObjectTokens.register_buffer
+      ~KmeansEuclideanObjectTokens.register_forward_hook
+      ~KmeansEuclideanObjectTokens.register_forward_pre_hook
+      ~KmeansEuclideanObjectTokens.register_full_backward_hook
+      ~KmeansEuclideanObjectTokens.register_parameter
+      ~KmeansEuclideanObjectTokens.requires_grad_
+      ~KmeansEuclideanObjectTokens.set_extra_state
+      ~KmeansEuclideanObjectTokens.share_memory
+      ~KmeansEuclideanObjectTokens.state_dict
+      ~KmeansEuclideanObjectTokens.to
+      ~KmeansEuclideanObjectTokens.to_empty
+      ~KmeansEuclideanObjectTokens.train
+      ~KmeansEuclideanObjectTokens.type
+      ~KmeansEuclideanObjectTokens.xpu
+      ~KmeansEuclideanObjectTokens.zero_grad
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+        ~KmeansEuclideanObjectTokens.T_destination
+        ~KmeansEuclideanObjectTokens.dump_patches
+   
+   

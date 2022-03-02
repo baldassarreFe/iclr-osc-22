@@ -1,0 +1,6 @@
+osc.data.utils.unnormalize\_pt
+==============================
+
+.. currentmodule:: osc.data.utils
+
+.. autofunction:: unnormalize_pt

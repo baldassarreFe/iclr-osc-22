@@ -1,0 +1,6 @@
+osc.train.batches\_per\_epoch\_train
+====================================
+
+.. currentmodule:: osc.train
+
+.. autofunction:: batches_per_epoch_train

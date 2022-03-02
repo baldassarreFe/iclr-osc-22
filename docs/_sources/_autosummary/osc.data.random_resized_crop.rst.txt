@@ -1,0 +1,32 @@
+osc.data.random\_resized\_crop
+==============================
+
+.. automodule:: osc.data.random_resized_crop
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      get_params
+      random_resized_crop
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
