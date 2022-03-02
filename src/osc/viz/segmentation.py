@@ -20,9 +20,9 @@ def match_segmentation_masks(
     Returns:
         Tuple of ``(iou_idx, iou_val, dice_idx, dice_val)``.
         IoU indexes indicate that the best match for ``masks[b, t]`` is
-        ``preds_thres[b, iou_idx[b, t]]`` with an IoU of ``iou_val[b, t]`.
+        ``preds_thres[b, iou_idx[b, t]]`` with an IoU of ``iou_val[b, t]``.
         DICE indexes indicate that the best match for ``masks[b, t]`` is
-        ``preds[b, dice_idx[b, t]]`` with a DICE score of ``dice_val[b, t]`.
+        ``preds[b, dice_idx[b, t]]`` with a DICE score of ``dice_val[b, t]``.
     """
     assert masks.dtype == torch.bool
     B = masks.shape[0]

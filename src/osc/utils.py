@@ -195,13 +195,16 @@ def ravel_multi_index_tf(
             Also, ``all(multi_index[i] < dims[i])`` is expected to hold for all ``i``.
 
     Example:
-        How to use::
+        How to use:
 
-        >>> ravel_multi_index_tf((
+        >>> ravel_multi_index_tf(
+        >>>   (
         >>>     tf.constant([4, 3, 3, 2]),
         >>>     tf.constant([0, 1, 5, 6]),
         >>>     tf.constant([0, 1, 2, 0]),
-        >>> ), (5, 7, 3))
+        >>>   ),
+        >>>   dims=(5, 7, 3)
+        >>> )
         [84, 67, 80, 60]
 
     Returns:
@@ -213,20 +216,19 @@ def ravel_multi_index_tf(
     return tf.reduce_sum(result, axis=0)
 
 
-StringDict = Mapping[str, Union[Any, "StringDict"]]
-
-
-def to_dotlist(
-    d: StringDict, prf: Tuple[str, ...] = tuple()
-) -> Iterator[Tuple[str, Any]]:
+def to_dotlist(d, prf: Tuple[str, ...] = tuple()) -> Iterator[Tuple[str, Any]]:
     """Iterate over a flattened dict using dot-separated keys.
 
     Args:
         d: a hierarchical dictionary with strings as keys
         prf: tuple of prefixes used for recursion
 
+    Notes:
+        The type of ``d`` can be defined as ``StringDict``, but it clashes with Sphynx:
+        ``StringDict = Mapping[str, Union[Any, StringDict]]``.
+
     Examples:
-        Flatten a dict::
+        Flatten a dict:
 
         >>> print(*to_dotlist({'a': {'b': {}, 'c': 1, 'd': [2]}, 'x': []}), sep="\\n")
         ('a.b', {})

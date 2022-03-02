@@ -28,7 +28,9 @@
 
    .. autosummary::
    {% for item in attributes %}
-      ~{{ name }}.{{ item }}
+      {%- if item != 'training' %}
+        ~{{ name }}.{{ item }}
+      {%- endif -%}
    {%- endfor %}
    {% endif %}
    {% endblock %}
