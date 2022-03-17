@@ -335,7 +335,9 @@ def build_model(cfg: DictConfig) -> Model:
     else:
         obj_proj = MLP(
             in_features=cfg.model.backbone.embed_dim,
-            hidden_features=4 * cfg.model.backbone.embed_dim,
+            hidden_features=int(
+                np.round(cfg.model.obj_proj.hidden_mult * cfg.model.backbone.embed_dim)
+            ),
             out_features=cfg.model.backbone.embed_dim,
             activation=activations[cfg.model.obj_proj.activation],
             out_bias=False,
