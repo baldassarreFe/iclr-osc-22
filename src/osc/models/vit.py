@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Type
 
 import timm.models
 import torch
@@ -23,6 +23,8 @@ class ViTBackbone(nn.Module):
         block_attn_drop: float = 0.0,
         drop_path: float = 0.0,
         mlp_ratio: float = 4.0,
+        act_layer: Type[nn.Module] = nn.GELU,
+        norm_layer: Type[nn.Module] = nn.LayerNorm,
         global_pool: str = "cls"
     ):
         super().__init__()
@@ -54,8 +56,8 @@ class ViTBackbone(nn.Module):
                     drop=block_drop,
                     attn_drop=block_attn_drop,
                     drop_path=drop_path,
-                    act_layer=nn.GELU,
-                    norm_layer=nn.LayerNorm,
+                    act_layer=act_layer,
+                    norm_layer=norm_layer,
                 )
                 for _ in range(num_layers)
             ]

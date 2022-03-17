@@ -7,7 +7,7 @@ the attention itself, and the output projections.
 Block modules wrap an attention module with layer norm,
 feed-forward layers and residual connections.
 """
-from typing import Tuple
+from typing import Tuple, Type
 
 import numpy as np
 import opt_einsum
@@ -58,6 +58,7 @@ class SelfAttention(nn.Module):
         BLHC = (B, L, num_heads, head_dim)
         BHLL = (B, num_heads, L, L)
         self.dot_fn = opt_einsum.contract_expression("bqhc, bkhc -> bhqk", BLHC, BLHC)
+        self.softmax = nn.Softmax(dim=-1)
         self.out_fn = opt_einsum.contract_expression("bhqk, bkhc -> bqhc", BHLL, BLHC)
 
         self.attn_drop = nn.Dropout(attn_drop)
@@ -83,7 +84,7 @@ class SelfAttention(nn.Module):
 
         # ([B Q H C], [B K H C]) -> [B H Q K]
         dots = self.dot_fn(q, k)
-        attn = dots.softmax(dim=-1)
+        attn = self.softmax(dots)
         attn = self.attn_drop(attn)
 
         # ([B H Q K], [B K H C]) -> [B Q H C]
@@ -137,6 +138,7 @@ class CrossAttention(nn.Module):
         BKHC = (B, K, num_heads, head_dim)
         BHQK = (B, num_heads, Q, K)
         self.dot_fn = opt_einsum.contract_expression("bqhc, bkhc -> bhqk", BQHC, BKHC)
+        self.softmax = nn.Softmax(dim=-1)
         self.out_fn = opt_einsum.contract_expression("bhqk, bkhc -> bqhc", BHQK, BKHC)
 
         self.attn_drop = nn.Dropout(attn_drop)
@@ -167,7 +169,7 @@ class CrossAttention(nn.Module):
 
         # ([B Q H C], [B K H C]) -> [B H Q K]
         dots = self.dot_fn(q, k)
-        attn = dots.softmax(dim=-1)
+        attn = self.softmax(dots)
         attn = self.attn_drop(attn)
 
         # ([B H Q K], [B K H C]) -> [B Q H C]
@@ -313,8 +315,8 @@ class SelfAttentionBlock(nn.Module):
         drop: float = 0.0,
         attn_drop: float = 0.0,
         drop_path: float = 0.0,
-        act_layer: nn.Module = nn.GELU,
-        norm_layer: nn.Module = nn.LayerNorm,
+        act_layer: Type[nn.Module] = nn.GELU,
+        norm_layer: Type[nn.Module] = nn.LayerNorm,
     ):
         """Init.
 
@@ -411,8 +413,8 @@ class CrossAttentionBlock(nn.Module):
         drop=0.0,
         attn_drop=0.0,
         drop_path=0.0,
-        act_layer=nn.GELU,
-        norm_layer=nn.LayerNorm,
+        act_layer: Type[nn.Module] = nn.GELU,
+        norm_layer: Type[nn.Module] = nn.LayerNorm,
     ):
         """Init.
 
@@ -516,6 +518,8 @@ class CrossAttentionDecoder(nn.Module):
         block_attn_drop: float = 0.0,
         drop_path: float = 0.0,
         mlp_ratio: float = 4.0,
+        act_layer: Type[nn.Module] = nn.GELU,
+        norm_layer: Type[nn.Module] = nn.LayerNorm,
     ):
         """Init.
 
@@ -548,8 +552,8 @@ class CrossAttentionDecoder(nn.Module):
                     drop=block_drop,
                     attn_drop=block_attn_drop,
                     drop_path=drop_path,
-                    act_layer=nn.GELU,
-                    norm_layer=nn.LayerNorm,
+                    act_layer=act_layer,
+                    norm_layer=norm_layer,
                 )
                 for _ in range(num_layers)
             ]
