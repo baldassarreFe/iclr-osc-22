@@ -108,38 +108,32 @@ def augment_train(
 
 
 @tf.function
-def augment_center_crop(
-    img: tf.Tensor, *, crop: float, img_size: ImgSizeHW, mean: ImgMean, std: ImgStd
-) -> tf.Tensor:
-    """Deterministic center crop and processing as in :func:`augment_train`
+def augment_center_crop(img: tf.Tensor, *, crop_size: ImgSizeHW) -> tf.Tensor:
+    """Crop the largest possible square from image center and resize to desired size.
 
     Args:
-        img: TF uint8 tensor of shape [H W C]
-        crop:
-        img_size:
-        mean:
-        std:
+        img: tf.float32 tensor of shape ``[H W C]``
+        crop_size: expected output size, for each edge.
 
     Returns:
-
+        A tf.float32 tensor of shape ``[*crop_size, C]``.
     """
-    img = tf.image.convert_image_dtype(img, tf.float32)
+    # Same as `H, W = img.shape[:2]` but works in graph mode
+    shape = tf.shape(img)[:2]
+    H = shape[0]
+    W = shape[1]
+    S = tf.reduce_min(shape)
+    y0 = (H - S) // 2
+    x0 = (W - S) // 2
+    y1 = (H + S) // 2
+    x1 = (W + S) // 2
 
-    img = tf.image.central_crop(img, crop)
-    img = tf.image.resize(img, img_size, method="bilinear", antialias=True)
-
-    img = normalize_tf(img, mean, std)
-    img = img_hwc_to_chw(img)
-
+    img = img[y0:y1, x0:x1, :]
+    img = tf.image.resize(img, crop_size, method="bilinear", antialias=True)
     return img
 
 
-AugmentFn = Callable[
-    [
-        tf.Tensor,
-    ],
-    tf.Tensor,
-]
+AugmentFn = Callable[[tf.Tensor], tf.Tensor]
 
 
 def augment_twice(augment_fn0: AugmentFn, augment_fn1: AugmentFn):

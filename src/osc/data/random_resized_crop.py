@@ -1,18 +1,23 @@
+from typing import Tuple
+
 import tensorflow as tf
+
+from osc.utils import ImgSizeHW
 
 ATTEMPTS = (10,)
 
 
 @tf.function
-def get_params(img, scale=(0.08, 1.0), ratio=(3.0 / 4.0, 4.0 / 3.0), seed=(0, 0)):
-    # Ratio < 1: vertical portrait image
-    # Ratio > 1: horizontal landscape image
-
-    H, W = img.shape[:2]
-    A = W * H
-
+def get_params(
+    H: float,
+    W: float,
+    scale: Tuple[float, float],
+    ratio: Tuple[float, float],
+    seed: Tuple[int, int],
+):
     seeds = tf.random.experimental.stateless_split(seed, num=4)
 
+    A = W * H
     target_area = A * tf.random.stateless_uniform(
         ATTEMPTS, seeds[0], minval=scale[0], maxval=scale[1]
     )
@@ -52,12 +57,39 @@ def get_params(img, scale=(0.08, 1.0), ratio=(3.0 / 4.0, 4.0 / 3.0), seed=(0, 0)
 
 @tf.function
 def random_resized_crop(
-    img, size=(64, 64), scale=(0.08, 1.0), ratio=(3.0 / 4.0, 4.0 / 3.0), seed=(0, 0)
+    img: tf.Tensor,
+    scale: Tuple[float, float] = (0.08, 1.0),
+    ratio: Tuple[float, float] = (3.0 / 4.0, 4.0 / 3.0),
+    size: ImgSizeHW = (64, 64),
+    seed: Tuple[int, int] = (0, 0),
 ):
-    ijhw = get_params(img, scale, ratio, seed)
-    height, width = img.shape[:2]
+    """Random resized crop as in torchvision.
+
+    Args:
+        img: a tf.float32 image with shape ``[H, W, C]``
+        scale: lower and upper bounds for the random area of the crop, before resizing,
+            relative to the original area of the image
+        ratio: lower and upper bounds for the random aspect ratio of the crop,
+            before resizing. Ratio>1 means horizontal landscape crop.
+        size: expected output size of the crop, for each edge.
+        seed: the seed for the random augmentation.
+
+    Returns:
+        A tf.float32 image with shape ``[*size, C]``
+    """
+    # Same as `H, W = img.shape[:2]` but works in graph mode
+    shape = tf.cast(tf.shape(img), tf.float32)
+    H = shape[0]
+    W = shape[1]
+
+    # Get crop coordinates: (y0, x0, height, width) in image coordinates
+    ijhw = get_params(H, W, scale, ratio, seed)
+
+    # Prepare box: (y0, x0, y1, x1) in normalized coordinates
     y0x0y1x1 = tf.concat([ijhw[:2], ijhw[:2] + ijhw[2:]], axis=0)
-    y0x0y1x1 /= [height, width, height, width]
+    y0x0y1x1 /= [H, W, H, W]
+
+    # Perform the crop (crop_and_resize assumes a batch)
     img = tf.image.crop_and_resize(
         img[None, :, :, :], boxes=y0x0y1x1[None, :], box_indices=(0,), crop_size=size
     )[0]
