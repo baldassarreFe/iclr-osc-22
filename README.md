@@ -26,7 +26,7 @@ python -m pip install \
     timm better_exceptions \
     sphinx-rtd-theme sphinx-autodoc-typehints \
     hydra_colorlog hydra-submitit-launcher namesgenerator \
-    'git+https://github.com/deepmind/multi_object_datasets'
+    tensorflow-datasets 'git+https://github.com/deepmind/multi_object_datasets'
 conda env config vars set BETTER_EXCEPTIONS=1
 pre-commit install
 
