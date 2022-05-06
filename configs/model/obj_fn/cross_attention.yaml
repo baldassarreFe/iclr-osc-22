@@ -1,8 +1,15 @@
+# Enable with: train.py model/obj_fn=cross_attention
+# Customize with: model.obj_fn.num_layers=2
+
 name: 'cross-attention'
-pos_embed: null
-num_layers: 2
-num_heads: 4
-block_drop: 0.0
-block_attn_drop: 0.0
+pos_embed: "backbone"
+pos_embed_drop: 0.0
+num_layers: 4
+reuse_layers: false
+num_heads: 8
+proj_drop: 0.0
+attn_drop: 0.0
 drop_path: 0.0
 mlp_ratio: 2.0
+mlp_drop: 0.0
+qkv_bias: false

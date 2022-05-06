@@ -12,21 +12,23 @@ cd iclr-osc-22
 
 Create an environment from scratch:
 ```bash
-ENV_NAME='iclr-osc-22'
+ENV_NAME='objects'
 conda create -y -n "${ENV_NAME}" -c pytorch -c conda-forge \
-    python=3.9 black isort pytest pre-commit \
-    hydra-core colorlog submitit tqdm wandb sphinx \
+    python=3.9 black isort pytest dill pre-commit \
+    hydra-core colorlog submitit fvcore tqdm wandb sphinx \
     'numpy>=1.20' pandas matplotlib seaborn tabulate scikit-learn scikit-image \
-    jupyterlab=3 jupyterlab_code_formatter jupyter_console \
+    jupyterlab=3 jupyterlab_code_formatter jupyter_console ipywidgets \
     tensorflow-cpu pytorch torchvision einops opt_einsum cudatoolkit-dev cudnn
 
 conda activate "${ENV_NAME}"
 
 python -m pip install \
-    timm better_exceptions \
+    better_exceptions \
     sphinx-rtd-theme sphinx-autodoc-typehints \
     hydra_colorlog hydra-submitit-launcher namesgenerator \
-    tensorflow-datasets 'git+https://github.com/deepmind/multi_object_datasets'
+    tensorflow-datasets \
+    'git+https://github.com/deepmind/multi_object_datasets' \
+    'git+https://github.com/rwightman/pytorch-image-models'
 conda env config vars set BETTER_EXCEPTIONS=1
 pre-commit install
 
@@ -96,7 +98,7 @@ Individual parameters from the configuration can be changed on the command line:
   model.backbone.patch_size='[4,4]' \
   model.backbone.embed_dim=64 \
   model.backbone.num_heads=8 \
-  model.backbone.{block_drop,block_attn_drop}=0.2
+  model.backbone.{proj_drop,attn_drop}=0.2
 ```
 
 All available configuration groups (e.g. different loss functions, attention types,
@@ -111,7 +113,7 @@ Running a parameter sweep in a SLURM environment is also supported, for example:
 ```bash
 ./train.py --multirun hydra/launcher=submitit_slurm +slurm=slurm \
   +losses=more_objects,more_global \
-  model=vit_obj_global \
+  model=bb_obj_global \
   model/obj_queries=sample \
   model.backbone.embed_dim=64,128,256 \
   logging.group='slurm_sweep' \

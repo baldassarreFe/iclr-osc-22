@@ -1,0 +1,18 @@
+# @package _global_
+
+# Usage: ./train.py +exp=overfit
+# If using more than one file from exp: ./train.py +exp='[debug,overfit]'
+
+data:
+  train:
+    max_samples: 6400
+  val:
+    max_samples: 6400
+  test:
+    vqa:
+      max_samples: 3200
+    segmentation:
+      max_samples: 3200
+
+logging:
+  tags: ['overfit']

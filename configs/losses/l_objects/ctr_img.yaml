@@ -1,5 +1,0 @@
-# Enable with: train.py losses/l_objects=ctr_img
-
-name: 'ctr_img'
-temp: 0.1
-weight: 1.0

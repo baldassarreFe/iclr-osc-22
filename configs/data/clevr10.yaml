@@ -1,30 +1,41 @@
 root: '~/multi-object-datasets'
 name: CLEVR10
-crop_size: [128, 128]
-crop_scale: [0.3, 1.0]
 
+crops:
+  large:
+    num: 2
+    size: [224, 224]
+    area: [.6, 1.0]
+    ratio: [.66, 1.5] # [2/3, 3/2]
+    strength: 1.0
+  small:
+    num: 4
+    size: [96, 96]
+    area: [ .08, 0.25 ]
+    ratio: [.66, 1.5] # [2/3, 3/2]
+    strength: 0.5
+
+# defaults to timm pretrained or [0.5, 0.5, 0.5]
 normalize:
-  mean: [0.485, 0.456, 0.406]
-  std: [0.229, 0.224, 0.225]
+  mean: null
+  std: null
 
 train:
   seed: null # defaults to random
   max_samples: null # defaults to all
+  shuffle_batches: 50
 
 val:
   seed: 6676759028237078
   max_samples: null # defaults to all
-
-viz:
-  seed: 6676759028237078
-  max_samples: 4
-  epoch_interval: 5
+  viz_samples: 4
 
 test:
-  max_samples: null # defaults to all
-  epoch_interval: 5
+  segmentation:
+    max_samples: null # defaults to all
   vqa:
-    seed: 759443315
-    num_epochs: 10000
+    max_samples: null # defaults to all
     split: 0.75
     pos_weight: 14.0
+    num_steps: 4000 # linear probe training steps
+    seed: 759443315 # linear probe seed

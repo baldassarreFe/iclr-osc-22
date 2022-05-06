@@ -1,0 +1,28 @@
+# Enable with model/backbone=vit_micro_patch8
+
+name: 'vit'
+
+# Input
+patch_size: [8, 8]
+
+# Embedding dimension C
+embed_dim: 128
+
+# Positional embedding
+pos_embed_drop: 0.2
+
+# Block configuration
+num_layers: 4
+num_heads: 4
+proj_drop: 0.2
+attn_drop: 0.2
+drop_path: 0.2
+mlp_ratio: 2.0
+qkv_bias: True
+
+# Output
+output_norm: false
+
+# Pretrained config from timm.models.vision_transformer
+pretrained: null
+frozen: false

@@ -1,0 +1,40 @@
+# @package _global_
+
+# Usage: ./train.py +exp=debug
+# If using more than one file from exp: ./train.py +exp='[debug,overfit]'
+
+data:
+  train:
+    seed: 42
+    max_samples: 50
+  val:
+    max_samples: 50
+  test:
+    segmentation:
+      max_samples: 50
+    vqa:
+      max_samples: 50
+      num_steps: 1000
+
+lr_scheduler:
+  multiplier: 1
+  warmup:
+    steps: 10
+  decay:
+    steps: 35
+  fixed:
+    steps: 5
+
+training:
+  batch_size: 5
+  checkpoint_interval: 20
+  val_interval: 20
+  test_interval: 20
+  viz_interval: 20
+
+other:
+  seed: 42
+  tqdm: true
+
+logging:
+  mode: 'disabled'

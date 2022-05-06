@@ -1,0 +1,4 @@
+# Enable with: train.py model/obj_queries=normal model.obj_queries.num_objects=16
+
+name: "normal"
+num_objects: 11 # S

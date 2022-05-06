@@ -1,22 +1,60 @@
 defaults:
-  - model: vit_obj_global
+  - model: bb_obj_global
   - data: clevr10
-  - losses/l_global: ctr
-  - losses/l_objects: ctr_img
-  - optimizer: adam
-  - lr_scheduler: linear1_cosine4_x10
+  - optimizer: adamw
   - logging: wandb
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
   - _self_
 
+lr_scheduler:
+  multiplier: 2
+  warmup:
+    steps: 1000
+    start_factor: 0.01  # as a fraction of the initial lr
+    end_factor: 1.0  # as a fraction of the initial lr
+  decay:
+    name: 'cosine'  # or 'exponential'
+    steps: 4000
+    end_factor: 0.1  # as a fraction of the initial lr
+  fixed:
+    steps: 0
+
 training:
-  batch_size: 64
-  num_epochs: null # defaults to warmup + decay
-  checkpoint_interval: 5
+  batch_size: 32
+  checkpoint_interval: 1000
+  val_interval: 1000
+  test_interval: 1000
+  viz_interval: 1000
+
+losses:
+  l_global:
+    ctr:
+      temp: 0.1
+      weight: 1.0
+    sim:
+      weight: 0.0
+    var:
+      weight: 0.5
+    cov:
+      weight: 0.3
+  l_objects:
+    ctr_all:
+      temp: 0.1
+      weight: 0.0
+    ctr_img:
+      temp: 0.1
+      weight: 0.0
+    sim_img:
+      weight: 1.0
+    var:
+      weight: 0.5
+    cov:
+      weight: 0.3
+    sim_small:
+      weight: 1.0
 
 other:
-  debug: false
   tqdm: true
   seed: null # defaults to random
   device: 'cuda:0'

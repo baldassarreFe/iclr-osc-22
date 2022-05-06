@@ -1,0 +1,16 @@
+# Enable with: train.py model/obj_fn=obj_attention
+# Customize with: model.obj_fn.num_heads=4
+
+name: 'obj-attention'
+pos_embed: "backbone"
+pos_embed_drop: 0.0
+num_objects: 11
+background_token: true
+num_heads: 4
+num_layers: 3
+reuse_layers: true
+proj_drop: 0.0
+attn_drop: 0.0
+drop_path: 0.0
+mlp_ratio: 2.0
+mlp_drop: 0.0

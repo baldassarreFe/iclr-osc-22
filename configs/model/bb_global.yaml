@@ -1,0 +1,11 @@
+# Select this architecture with model=bb_global
+# To change something use e.g. model/backbone=vit_vit_base_patch8_224_in21k
+#
+# This model doesn't output object features/projections,
+# make sure to run with losses.l_objects.*.weight=0
+
+defaults:
+  - _self_
+  - backbone: vit_small_patch8_224_dino
+  - global_fn: cross_attn_pool
+  - global_proj: mlp

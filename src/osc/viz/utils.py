@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Sequence, Tuple, Union
 
 import numpy as np
-import skimage.filters
 import torch
 from IPython.core.display import Image
 from IPython.core.display_functions import display
@@ -14,6 +13,7 @@ from matplotlib.axis import Axis
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 from PIL import Image as PilImage
+from skimage.filters.thresholding import threshold_otsu
 from torch import Tensor
 
 
@@ -135,10 +135,47 @@ def batched_otsu(x: np.ndarray) -> np.ndarray:
     """
     result = np.empty(x.shape, dtype=bool)
     for b in np.ndindex(x.shape[:-2]):
-        result[b] = x[b] > skimage.filters.threshold_otsu(x[b])
+        result[b] = x[b] > threshold_otsu(x[b])
     return result
 
 
-def batched_otsu_pt(x: Tensor) -> Tensor:
-    """Same as :func:``batched_otsu`` but with torch tensors."""
-    return torch.from_numpy(batched_otsu(x.cpu().numpy())).to(x.device)
+@torch.jit.script
+def threshold_otsu_pt(imgs_pt: Tensor, bins: int = 256) -> Tensor:
+    """Otsu thresholding on (batched) torch tensors.
+
+    Args:
+        imgs_pt: torch.float32 tensor of images, shape ``[..., H, W]`` with
+            optional leading batch dimensions
+        bins: number of bins for each image
+
+    Returns:
+        Scalar tensor or tensor of thresholds with shape ``[...]``.
+    """
+    H, W = imgs_pt.shape[-2:]
+    x = imgs_pt.reshape(-1, H * W)
+    B = x.shape[0]
+
+    counts = x.new_empty((B, bins))
+    bin_edges = x.new_empty((B, bins + 1))
+    for b in range(B):
+        counts[b], bin_edges[b] = torch.histogram(x[b], bins=bins, range=None)
+    bin_centers = (bin_edges[:, 1:] + bin_edges[:, :-1]) / 2
+
+    # class probabilities for all possible thresholds
+    weight1 = counts.cumsum(-1)
+    weight2 = counts.flip(-1).cumsum(-1)
+
+    # class means for all possible thresholds
+    cbc = counts * bin_centers
+    mean1 = cbc.cumsum(-1) / weight1
+    mean2 = (cbc.flip(-1).cumsum(-1) / weight2).flip(-1)
+
+    # Clip ends to align class 1 and class 2 variables:
+    # The last value of ``weight1``/``mean1`` should pair with zero values in
+    # ``weight2``/``mean2``, which do not exist.
+    weight2 = weight2.flip(-1)
+    variance12 = weight1[:, :-1] * weight2[:, 1:] * (mean1[:, :-1] - mean2[:, 1:]) ** 2
+
+    idx = variance12.argmax(-1, keepdim=True)
+    threshold = bin_centers.gather(-1, idx)
+    return threshold.reshape(imgs_pt.shape[:-2])

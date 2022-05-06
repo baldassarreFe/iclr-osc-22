@@ -1,4 +1,11 @@
+# Enable with: train.py model/obj_fn=slot_attention
+# Customize with: model.obj_fn.num_layers=2
+
 name: 'slot-attention'
-hidden_mult: 2.0
-pos_embed: null
-num_iters: 3
+pos_embed: "backbone"
+pos_embed_drop: 0.0
+num_layers: 3  # always reused
+mlp_ratio: 2.0
+mlp_drop: 0.0
+fixed_point: false
+bias_first: null

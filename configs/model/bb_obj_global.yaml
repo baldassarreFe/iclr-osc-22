@@ -1,0 +1,11 @@
+# Select this architecture with model=bb_obj_global
+# To change something use e.g. model/backbone=vit_vit_base_patch8_224_in21k
+
+defaults:
+  - _self_
+  - backbone: vit_small_patch8_224_dino
+  - global_fn: cross_attn_pool
+  - global_proj: mlp
+  - obj_queries: normal
+  - obj_fn: slot_attention
+  - obj_proj: mlp

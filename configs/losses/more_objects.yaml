@@ -1,7 +1,0 @@
-# Objects loss is weighted 10 times more than global
-# Enable with: train.py +losses=more_objects
-
-l_global:
-  weight: 0.1
-l_objects:
-  weight: 1.0

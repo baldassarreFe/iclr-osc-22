@@ -16,10 +16,11 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tqdm
+from keras.preprocessing.image import smart_resize
 
 from osc.data.tfrecords import deserialize_image, serialize_image
-from osc.data.utils import normalize_tf
-from osc.utils import ImgMean, ImgSizeHW, ImgStd
+from osc.data.utils import img_hwc_to_chw, normalize_tf
+from osc.utils import ImgSizeHW
 
 IMAGE_SIZE = multi_object_datasets.clevr_with_masks.IMAGE_SIZE
 MAX_NUM_ENTITIES = multi_object_datasets.clevr_with_masks.MAX_NUM_ENTITIES
@@ -165,8 +166,8 @@ def prepare_test_segmentation(
     example,
     img_size: ImgSizeHW,
     crop_size: ImgSizeHW,
-    mean: ImgMean,
-    std: ImgStd,
+    mean: tf.Tensor,
+    std: tf.Tensor,
 ):
     """Prepare a test example for segmentation (center crop+normalization)
 
@@ -215,10 +216,9 @@ def prepare_test_segmentation(
 @tf.function
 def prepare_test_vqa(
     example,
-    img_size: ImgSizeHW,
     crop_size: ImgSizeHW,
-    mean: ImgMean,
-    std: ImgStd,
+    mean: tf.Tensor,
+    std: tf.Tensor,
 ):
     """Prepare a test example for VQA (center crop+normalization)
 
@@ -228,7 +228,6 @@ def prepare_test_vqa(
 
     Args:
         example:
-        img_size: image size ``(H, W)``
         crop_size: crop size ``(H, W)``
         mean: image mean for normalization
         std: image standard deviation for normalization
@@ -237,22 +236,12 @@ def prepare_test_vqa(
         A dict containing the image ``[3 H W]`` and the VQA target ``[V]``.
 
     """
-    # image: [H W 3]
+    # image: [H W RGB] -> [RGB H W]
     image = example["image"]
-
-    # Crop a square from the center
-    H, W = img_size
-    S = min(H, W)
-    y0 = (H - S) // 2
-    x0 = (W - S) // 2
-    y1 = (H + S) // 2
-    x1 = (W + S) // 2
-    image = image[y0:y1, x0:x1, :]
-
     image = tf.image.convert_image_dtype(image, tf.float32)
+    image = smart_resize(image, crop_size)
     image = normalize_tf(image, mean, std)
-    image = tf.image.resize(image, crop_size)
-    image = tf.transpose(image, [2, 0, 1])
+    image = img_hwc_to_chw(image)
 
     # First object is always background, so slice [1:]
     # Background and non-existing objects have a value of 0 for all attributes,

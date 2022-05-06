@@ -1,4 +1,0 @@
-# Enable with: train.py model/obj_queries/kmeans_euclidean
-
-name: "kmeans_euclidean"
-num_objects: 11 # S

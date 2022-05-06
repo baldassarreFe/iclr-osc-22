@@ -1,6 +1,0 @@
-warmup:
-  epochs: 10
-decay:
-  name: 'cosine'
-  epochs: 40
-  end_lr: 0.0003

@@ -1,4 +1,0 @@
-# Enable with: train.py losses/l_global=sim
-
-name: 'sim'
-weight: 1.0

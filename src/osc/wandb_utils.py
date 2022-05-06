@@ -8,24 +8,25 @@ from omegaconf import OmegaConf
 
 log = logging.getLogger(__name__)
 
+# Excluded from the wandb dashboard
 EXCLUDE_HPARAMS = (
     "data.root",
     "data.normalize",
     "data.train.seed",
     "data.val.seed",
+    "data.val.viz_samples",
+    "data.test.vqa.seed",
     "other",
     "logging",
     "training.checkpoint_interval",
+    "training.val_interval",
+    "training.viz_interval",
+    "training.test_interval",
 )
 
 
 def setup_wandb(cfg):
     """Create wandb run, save config, log, and hyperparameters"""
-    if cfg.other.debug:
-        mode = "disabled"
-        log.info("Debug run, wandb disabled")
-    else:
-        mode = "online"
     wandb.init(
         project=cfg.logging.project,
         group=cfg.logging.group,
@@ -34,7 +35,7 @@ def setup_wandb(cfg):
         tags=cfg.logging.tags,
         notes=cfg.logging.notes,
         config=filter_cfg_for_wandb(cfg),
-        mode=mode,
+        mode=cfg.logging.mode,
     )
     wandb.save("train.yaml", policy="now")
     wandb.save("train.log", policy="live")

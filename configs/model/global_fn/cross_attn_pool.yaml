@@ -1,0 +1,13 @@
+# Enable with: train.py model/global_fn=cross_attention
+# Customize with: model.global_fn.num_layers=2
+
+name: 'cross-attention-pool'
+num_layers: 2
+reuse_layers: false
+num_heads: 8
+proj_drop: 0.0
+attn_drop: 0.0
+drop_path: 0.0
+mlp_ratio: 2.0
+mlp_drop: 0.0
+qkv_bias: false

@@ -1,0 +1,14 @@
+# Enable with: train.py model/obj_queries=templates model.obj_queries.num_templates=32
+
+name: "templates"
+num_templates: 64
+background_token: true
+num_selected: 16
+num_heads: 4
+qkv_bias: true
+attn_drop: 0.0
+proj_drop: 0.0
+mlp_ratio: 2.0
+mlp_drop: 0.0
+drop_path: 0.0
+num_instances: 2

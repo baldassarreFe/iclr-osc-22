@@ -1,4 +1,4 @@
-# Enable with: train.py model/obj_queries/sample model.obj_queries.num_components=1
+# Enable with: train.py model/obj_queries=sample model.obj_queries.num_components=1
 
 name: "sample"
 num_objects: 11 # S

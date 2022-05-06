@@ -13,7 +13,7 @@ def self_attn_rollout(
     head_reduction: Union[str, Callable] = "mean",
     adjust_residual=True,
     global_avg_pool=True,
-):
+) -> Tensor:
     """Self-attn rollout: how much output token(s) attend to input tokens across layers
 
     Args:
@@ -52,7 +52,9 @@ def self_attn_rollout(
     return rollout
 
 
-def slot_attn_rollout(attns, normalize="layer"):
+def slot_attn_rollout(
+    attns: Union[Mapping[str, Tensor], Sequence[Tensor]], normalize="layer"
+) -> Tensor:
     """Slot attention rollout: how much a slot token attends to context tokens.
 
     Args:
@@ -81,7 +83,7 @@ def slot_attn_rollout(attns, normalize="layer"):
     return rollout
 
 
-def cross_attn_rollout(attns):
+def cross_attn_rollout(attns: Union[Mapping[str, Tensor], Sequence[Tensor]]) -> Tensor:
     """Cross attention rollout: how much an object token attends to context tokens.
 
     Args:
@@ -119,3 +121,12 @@ def cross_attn_rollout(attns):
             raise ValueError(attn.shape)
 
     return normalize_sum_to_one(R_sk)
+
+
+def obj_attn_rollout(attns: Union[Mapping[str, Tensor], Sequence[Tensor]]) -> Tensor:
+    if isinstance(attns, Mapping):
+        attns = list(attns.values())
+    if isinstance(attns, Sequence):
+        attns = [a.detach().mean(dim=1) for a in attns]
+    # TODO implement obj attention rollout
+    return attns[-1]

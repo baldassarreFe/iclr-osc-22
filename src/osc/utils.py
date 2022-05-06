@@ -8,12 +8,13 @@ import random
 import signal
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import tabulate
 import tensorflow as tf
 import torch
+from fvcore.common.timer import Timer
 from torch import Tensor
 
 log = logging.getLogger(__name__)
@@ -147,7 +148,7 @@ def seed_everything(seed: int):
 
 
 def latest_checkpoint(run_dir: Union[Path, str]) -> Path:
-    """Find the checkpoint with the highest numerical epoch.
+    """Find the checkpoint with the highest numerical epoch/step identifier.
 
     Args:
         run_dir: the search path containing ``checkpoint.*.pth`` files.
@@ -162,8 +163,15 @@ def latest_checkpoint(run_dir: Union[Path, str]) -> Path:
 
 @torch.jit.script
 def normalize_sum_to_one(tensor: Tensor, dim: int = -1) -> Tensor:
-    """Normalize tensor so that it sums to one over the last dimension."""
+    """Normalize tensor so that it sums to one over one dimension (e.g. the last)."""
     return tensor / tensor.sum(dim=dim, keepdim=True).clamp_min(1e-8)
+
+
+@torch.jit.script
+def normalize_zero_one(tensor: Tensor, dim: int = -1) -> Tensor:
+    """Normalize tensor so that its values are in the ``[0, 1]`` range."""
+    min_max = torch.aminmax(tensor, dim=dim, keepdim=True)
+    return (tensor - min_max[0]) / (min_max[1] - min_max[0]).clamp_min(1e-8)
 
 
 def fill_diagonal_(x: Tensor, value: float = -torch.inf) -> Tensor:
@@ -180,6 +188,22 @@ def fill_diagonal_(x: Tensor, value: float = -torch.inf) -> Tensor:
     N, M = x.shape[-2:]
     mask = torch.eye(N, M, dtype=torch.bool, device=x.device)
     return x.masked_fill_(mask, value)
+
+
+def fill_diagonal(x: Tensor, value: float = -torch.inf) -> Tensor:
+    """Fill diagonal of torch tensor, batched and out-of-place.
+
+    Args:
+        x: ``[..., N, M]`` tensor with leading batch dimensions.
+        value: value to fill the diagonal with.
+
+    Returns:
+        A new ``[..., N, M]`` tensor with diagonal entries
+        ``x[..., i, i]`` replaced.
+    """
+    N, M = x.shape[-2:]
+    mask = torch.eye(N, M, dtype=torch.bool, device=x.device)
+    return x.masked_fill(mask, value)
 
 
 @tf.function
@@ -253,43 +277,58 @@ class SigIntCatcher(AbstractContextManager):
     Example:
         Gracefully terminate a loop:
 
-        >>> with SigIntCatcher() as should_stop:
+        >>> with SigIntCatcher() as catcher:
         >>>     for i in range(1000):
         >>>         print(f"Step {i}...")
         >>>         time.sleep(5)
         >>>         print("Done")
-        >>>         if should_stop:
+        >>>         if catcher.count > 0:
         >>>             break
     """
 
-    def __init__(self):
-        self._interrupted = None
+    def __init__(self, raise_after=5):
+        self._count = None
         self._old_handler = None
+        self._raise_after = raise_after
 
-    def __bool__(self):
-        return self._interrupted
+    @property
+    def count(self) -> int:
+        if self._count is None:
+            raise RuntimeError("SigIntCatcher context manager is not active")
+        return self._count
 
     def __enter__(self):
         self._old_handler = signal.getsignal(signal.SIGINT)
-        self._interrupted = False
+        self._count = 0
         signal.signal(signal.SIGINT, self._handler)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         signal.signal(signal.SIGINT, self._old_handler)
-        self._interrupted = None
+        self._count = None
         self._old_handler = None
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}"
+            f"(count={self._count}, raise_after={self._raise_after})"
+        )
 
     # noinspection PyUnusedLocal
     def _handler(self, signum, frame):
-        if not self._interrupted:
-            log.warning(
-                "Interrupted, wait for graceful termination, repeat to raise exception"
-            )
-            self._interrupted = True
-        else:
+        if self._count is None:
+            raise RuntimeError("SigIntCatcher context manager is not active")
+        self._count += 1
+        if self._count >= self._raise_after:
             log.warning("Interrupted again, raising exception")
             raise KeyboardInterrupt()
+        else:
+            log.warning(
+                "Interrupted %d times, wait for graceful termination, "
+                "repeat %d more times to raise exception",
+                self._count,
+                self._raise_after - self._count,
+            )
 
 
 class StepCounter(object):
@@ -316,14 +355,24 @@ class AverageMetric(object):
         self.total = 0.0
         self.count = 0
 
-    def update(self, values: Tensor):
-        """Update.
+    def update_tensor(self, tensor: Tensor):
+        """Update with the values from a tensor.
 
         Args:
-            values: a 1D tensor of per-sample metric values.
+            tensor: per-sample metric values, it will be flattened.
         """
-        self.total += values.detach().sum().item()
-        self.count += values.numel()
+        self.total += tensor.detach().sum().item()
+        self.count += tensor.numel()
+
+    def update_scalar(self, scalar: Tensor, num: int):
+        """Update with a single scalar that represents the average of ``num`` samples.
+
+        Args:
+            scalar: a scalar value representing the average of ``num`` samples
+            num: how many samples ``scalar`` stands for
+        """
+        self.total += num * scalar.item()
+        self.count += num
 
     def compute(self) -> float:
         """Compute.
@@ -332,3 +381,44 @@ class AverageMetric(object):
             The current average.
         """
         return self.total / self.count
+
+
+def normalized_meshgrid(height: int, width: int) -> Tensor:
+    height = torch.linspace(-1, 1, steps=height)
+    width = torch.linspace(-1, 1, steps=width)
+    grid = torch.meshgrid(height, width, indexing="ij")
+    grid = torch.stack(grid, dim=-1)
+    return grid
+
+
+def check_num_samples(max_samples, num_samples: int):
+    if max_samples > num_samples:
+        raise ValueError(
+            f"Requested {max_samples} max samples, "
+            f"but the dataset only contains {num_samples} samples",
+        )
+
+
+class TimerCollection(object):
+    """Collection of :class:`Timer` objects that are instantiated lazily."""
+
+    def __init__(self):
+        self._timers: Dict[str, Timer] = {}
+
+    def resume(self, name: str):
+        """Resume an existing timer. If it doesn't exist yet, a new timer is created"""
+        # Workaround: timers start immediately upon creation and trying to resume
+        # a started timer would produce an error.
+        if name not in self._timers:
+            self._timers[name] = Timer()
+        else:
+            self[name].resume()
+
+    def pause(self, name: str):
+        self[name].pause()
+
+    def __getitem__(self, name: str) -> Timer:
+        return self._timers[name]
+
+    def __iter__(self) -> Iterator[Tuple[str, Timer]]:
+        yield from self._timers.items()

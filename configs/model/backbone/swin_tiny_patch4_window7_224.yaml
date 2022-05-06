@@ -1,0 +1,29 @@
+# Enable with model/backbone=swin_tiny_patch4_window7_224
+
+name: 'swin'
+
+# Input
+patch_size: [4, 4]
+
+# Embedding dimension C
+embed_dim: 96
+
+# Positional embedding
+pos_embed_drop: 0.0
+
+# Block configuration
+num_layers: [2, 2, 6, 2]
+num_heads: [3, 6, 12, 24]
+window_size: 7
+proj_drop: 0.0
+attn_drop: 0.0
+drop_path: 0.1
+mlp_ratio: 4.0
+qkv_bias: True
+
+# Output
+output_norm: false
+
+# Pretrained config from timm.models.vision_transformer
+pretrained: 'swin_tiny_patch4_window7_224'
+frozen: true
