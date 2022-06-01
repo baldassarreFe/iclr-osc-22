@@ -52,6 +52,7 @@ from osc.utils import (
     batches_per_epoch,
     check_num_samples,
     seed_everything,
+    tf_no_gpus,
 )
 from osc.viz.backbone import kmeans_clusters
 from osc.viz.embeds import viz_positional_embedding
@@ -72,6 +73,7 @@ def main(cfg: DictConfig) -> None:
     setup_wandb(cfg)
     seed_everything(cfg.other.seed)
     log_env_info()
+    tf_no_gpus()
 
     ds_train = build_dataset_train(cfg)
     ds_val = build_dataset_val(cfg)

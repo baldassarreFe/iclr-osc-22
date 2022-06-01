@@ -422,3 +422,10 @@ class TimerCollection(object):
 
     def __iter__(self) -> Iterator[Tuple[str, Timer]]:
         yield from self._timers.items()
+
+
+def tf_no_gpus():
+    """Disable GPU devices for tensorflow let it print its warnings."""
+    # List GPUs with: tf.config.list_physical_devices("GPU")
+    tf.config.set_visible_devices([], "GPU")
+    tf.ones([4])

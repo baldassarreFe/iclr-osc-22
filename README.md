@@ -14,11 +14,12 @@ Create an environment from scratch:
 ```bash
 ENV_NAME='objects'
 conda create -y -n "${ENV_NAME}" -c pytorch -c conda-forge \
-    python=3.9 black isort pytest dill pre-commit \
+    python black isort pytest dill pre-commit \
     hydra-core colorlog submitit fvcore tqdm wandb sphinx \
-    'numpy>=1.20' pandas matplotlib seaborn tabulate scikit-learn scikit-image \
-    jupyterlab=3 jupyterlab_code_formatter jupyter_console ipywidgets \
-    tensorflow-cpu pytorch torchvision einops opt_einsum cudatoolkit-dev cudnn
+    numpy pandas matplotlib seaborn tabulate scikit-learn scikit-image \
+    jupyterlab jupyterlab_code_formatter jupyter_console ipywidgets \
+    pytorch tensorflow-gpu cudatoolkit-dev cudnn \
+    torchvision einops opt_einsum
 
 conda activate "${ENV_NAME}"
 
@@ -26,11 +27,12 @@ python -m pip install \
     better_exceptions \
     sphinx-rtd-theme sphinx-autodoc-typehints \
     hydra_colorlog hydra-submitit-launcher namesgenerator \
-    tensorflow-datasets \
+    tensorflow-datasets transformers datasets \
     'git+https://github.com/deepmind/multi_object_datasets' \
     'git+https://github.com/rwightman/pytorch-image-models'
 conda env config vars set BETTER_EXCEPTIONS=1
 pre-commit install
+pre-commit autoupdate
 
 python -m pip install --editable .
 ```

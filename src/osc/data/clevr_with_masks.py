@@ -33,23 +33,7 @@ decode = multi_object_datasets.clevr_with_masks._decode
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Preprocess and split CLEVR with masks dataset into 3 splits: "
-        "train+val only contain RGB images, "
-        "test contains the full sample dictionary."
-    )
-    parser.add_argument(
-        "--data-root",
-        type=Path,
-        required=True,
-        help="Filesystem path 'path/to/multi-object-datasets'",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing processed files 'imgs_{train,val,test}.tfrecords'",
-    )
-    args = parser.parse_args()
+    args = parse_args()
     data_root = args.data_root / "clevr_with_masks"
     dst_paths = {
         split: Path.as_posix(data_root / f"imgs_{split}.tfrecords")
@@ -72,6 +56,10 @@ def main():
         example_ = tf.py_function(serialize_image, (example_["image"],), tf.string)
         return example_
 
+    # The dataset comes as a single file. We split it in
+    # - 70K train: images only
+    # - 15K val:   images, masks, attributes, etc
+    # - 15K test:  images, masks, attributes, etc
     ds = (
         tf.data.TFRecordDataset(
             Path.as_posix(data_root / "clevr_with_masks_train.tfrecords"),
@@ -108,10 +96,31 @@ def main():
         if split in {"train", "val"}:
             ds_check = ds_check.map(partial(deserialize_image, img_size=IMAGE_SIZE))
         else:
-            ds_check = ds_check.map(multi_object_datasets.clevr_with_masks._decode)
+            ds_check = ds_check.map(decode)
             ds_check = ds_check.map(fix_tf_dtypes)
         for _ in tqdm.tqdm(ds_check, desc=f"Reading {split}", unit=" imgs", total=100):
             pass
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Preprocess and split CLEVR with masks dataset into 3 splits: "
+        "train+val only contain RGB images, "
+        "test contains the full sample dictionary."
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        required=True,
+        help="Filesystem path 'path/to/multi-object-datasets'",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing processed files 'imgs_{train,val,test}.tfrecords'",
+    )
+    args = parser.parse_args()
+    return args
 
 
 def show_sample(sample):
